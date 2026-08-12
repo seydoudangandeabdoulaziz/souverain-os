@@ -1,0 +1,36 @@
+# ============================================================
+# SOUVERAIN-OS — Docker Compose SOCLE
+# ============================================================
+# Brique 0 : AUCUN service métier n'est démarré ici.
+# Ce fichier utilise des "profiles" Docker Compose : chaque
+# groupe de services futur sera activé uniquement quand sa
+# brique sera implémentée, via --profile <nom>.
+#
+# Exemple futur (Brique 1) :
+#   docker compose --profile postgres up
+#
+# Aujourd'hui : `docker compose up` ne lance rien (normal).
+# ============================================================
+
+name: souverain-os
+
+services: {}
+
+# ------------------------------------------------------------
+# Emplacement réservé pour les futurs services, par profile :
+#
+#   profiles: ["postgres"]   -> Brique 1 (PostgreSQL/TimescaleDB)
+#   profiles: ["neo4j"]      -> Brique 6 (Neo4j)
+#   profiles: ["redis"]      -> Phase transverse (Redis/Celery)
+#   profiles: ["ollama"]     -> Phase transverse (Ollama/Mistral)
+#   profiles: ["monitoring"] -> Phase transverse (Prometheus/Grafana)
+#
+# Chaque service sera ajouté explicitement, brique par brique,
+# jamais anticipé.
+# ------------------------------------------------------------
+
+volumes: {}
+
+networks:
+  souverain-net:
+    driver: bridge

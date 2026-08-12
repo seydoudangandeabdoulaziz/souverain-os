@@ -1,0 +1,36 @@
+# ============================================================
+# Brique 0 — Fondations
+# ============================================================
+# Dépendances ISOLÉES de cette brique (Option A du workspace uv).
+# Aucune dépendance métier : cette brique ne fait que valider
+# que l'environnement de développement est sain.
+# ============================================================
+
+[project]
+name = "brique-00-fondations"
+version = "0.1.0"
+description = "SOUVERAIN-OS — Brique 0 : socle de développement et healthcheck d'environnement"
+requires-python = ">=3.12"
+readme = "README.md"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "ruff>=0.6.9",
+    "mypy>=1.11.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "ruff>=0.6.9",
+    "mypy>=1.11.2",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/brique_00_fondations"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

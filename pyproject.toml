@@ -1,0 +1,55 @@
+# ============================================================
+# SOUVERAIN-OS — pyproject.toml RACINE (workspace uv)
+# ============================================================
+# Rôle : déclarer le workspace uv qui regroupe toutes les briques.
+# Chaque brique a SON PROPRE pyproject.toml sous briques/brique_XX/.
+#
+# Décision verrouillée (00_DECISIONS_VERROUILLEES.md, point 2) :
+# Option A — workspace uv avec dépendances isolées par brique,
+# lockfile unique racine résolvant l'ensemble du graphe.
+# ============================================================
+
+[project]
+name = "souverain-os"
+version = "0.1.0"
+description = "SOUVERAIN-OS — Système immunitaire numérique africain (workspace racine)"
+requires-python = ">=3.12"
+readme = "README.md"
+license = { text = "Proprietary" }
+
+# Le projet racine ne contient aucune dépendance métier.
+# C'est un point d'ancrage pour le workspace uv uniquement.
+dependencies = []
+
+[tool.uv.workspace]
+# Liste EXPLICITE des briques implémentées (pas un glob "briques/*").
+# Raison : les briques non commencées ne contiennent qu'un README.md
+# (règle STRUCTURE != IMPLÉMENTATION), sans pyproject.toml — un glob
+# échouerait donc systématiquement tant qu'elles ne sont pas démarrées.
+# Chaque brique est ajoutée ICI explicitement au moment de son
+# implémentation réelle, jamais avant.
+members = [
+    "briques/brique_00_fondations",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = []
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+warn_return_any = true
+
+[tool.pytest.ini_options]
+testpaths = ["briques", "tests"]
+python_files = ["test_*.py"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

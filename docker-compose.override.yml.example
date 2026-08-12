@@ -1,0 +1,11 @@
+# ============================================================
+# SOUVERAIN-OS — Exemple d'override local (développeur)
+# ============================================================
+# Copier ce fichier en docker-compose.override.yml pour
+# personnaliser localement sans impacter le socle versionné.
+# Ce fichier local est ignoré par Git (.gitignore).
+#
+# Brique 0 : aucun override nécessaire pour l'instant.
+# ============================================================
+
+services: {}
