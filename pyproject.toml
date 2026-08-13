@@ -30,6 +30,7 @@ dependencies = []
 # implémentation réelle, jamais avant.
 members = [
     "briques/brique_00_fondations",
+    "briques/brique_01_postgresql",
 ]
 
 [tool.ruff]

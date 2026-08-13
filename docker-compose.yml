@@ -14,12 +14,29 @@
 
 name: souverain-os
 
-services: {}
+services:
+  postgres:
+    image: timescale/timescaledb:2.17.2-pg16
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-souverain_os}
+      POSTGRES_USER: ${POSTGRES_USER:-souverain_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-souverain_admin}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - souverain-net
 
 # ------------------------------------------------------------
-# Emplacement réservé pour les futurs services, par profile :
+# Emplacements réservés pour les futurs services, par profile :
 #
-#   profiles: ["postgres"]   -> Brique 1 (PostgreSQL/TimescaleDB)
 #   profiles: ["neo4j"]      -> Brique 6 (Neo4j)
 #   profiles: ["redis"]      -> Phase transverse (Redis/Celery)
 #   profiles: ["ollama"]     -> Phase transverse (Ollama/Mistral)
@@ -29,7 +46,8 @@ services: {}
 # jamais anticipé.
 # ------------------------------------------------------------
 
-volumes: {}
+volumes:
+  postgres_data:
 
 networks:
   souverain-net:
