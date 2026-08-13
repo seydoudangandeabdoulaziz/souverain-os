@@ -10,8 +10,32 @@ en dur dispersée dans le code (Secure by Design).
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _find_env_file() -> str | None:
+    """
+    Cherche le fichier .env en remontant depuis ce fichier, pas depuis
+    le répertoire de travail courant.
+
+    Pourquoi c'est nécessaire : si on utilisait simplement env_file=".env",
+    ce chemin serait interprété relativement à l'endroit d'où la commande
+    est lancée (ex. "uv run python scripts/db_healthcheck.py" depuis
+    briques/brique_01_postgresql/). Le fichier .env réel est toujours à
+    la racine du dépôt, quel que soit le dossier courant — on le
+    retrouve donc en remontant l'arborescence.
+    """
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / ".env"
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+_ENV_FILE = _find_env_file()
 
 
 class PostgresSettings(BaseSettings):
@@ -19,12 +43,13 @@ class PostgresSettings(BaseSettings):
     Paramètres de connexion à l'instance PostgreSQL/TimescaleDB.
 
     Ces valeurs sont lues depuis le fichier .env à la racine du dépôt
-    (jamais commité — voir .env.example pour le modèle).
+    (jamais commité — voir .env.example pour le modèle), quel que soit
+    le répertoire depuis lequel le code est exécuté.
     """
 
     model_config = SettingsConfigDict(
         env_prefix="POSTGRES_",
-        env_file=".env",
+        env_file=_ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
     )
