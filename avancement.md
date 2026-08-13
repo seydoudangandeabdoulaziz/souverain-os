@@ -20,7 +20,7 @@ VALIDÉE
 |---|---|---|
 | 0 | Fondations | **VALIDÉE** |
 | 1 | PostgreSQL / TimescaleDB | **VALIDÉE** |
-| 2 | Auth / RBAC | NON COMMENCÉE |
+| 2 | Auth / RBAC | **VALIDÉE** |
 | 3 | Générateur + ingestion | NON COMMENCÉE |
 | 4 | Détection Hybrid-Stream | NON COMMENCÉE |
 | 5 | Scoring + alertes | NON COMMENCÉE |
@@ -102,6 +102,37 @@ Validation finale effectuée sur la machine réelle du fondateur, contre une vra
 - Non-régression Brique 0 confirmée.
 
 **Brique 1 validée. Prête pour l'analyse de la Brique 2 (Auth / RBAC minimal + fondations SOUVERAIN-ID) dès demande explicite du fondateur.**
+
+## Détail — Brique 2 (Auth / RBAC minimal + fondations SOUVERAIN-ID)
+
+**Statut : VALIDÉE**
+
+**Date de validation : 13 août 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+Décisions d'architecture actées (validées avant implémentation, en deux passes d'analyse) :
+- Utilisateurs dans `shared.users`, FK vers `shared.tenants_registry` (`ON DELETE RESTRICT`).
+- Hachage Argon2id (`argon2-cffi`).
+- JWT signé HMAC-SHA256 (MVP).
+- Révocation via `token_version` (implémentée dès cette brique, pas reportée).
+- Rôles MVP : `admin`, `analyst`, `auditor`.
+- SOUVERAIN-ID : fondation uniquement (UUID5 déterministe, séparé de `user_id`).
+- Migrations numérotées localement par brique (dépendance d'ordre documentée en texte).
+- Dépendance interne vers la Brique 1 via le workspace `uv` (`py.typed` ajouté à la Brique 1 pour exposer son typage).
+
+Livré :
+- `password_hashing.py`, `jwt_tokens.py`, `souverain_id.py`, `rbac.py`, `session.py`, `repository.py`, `api.py` (`/auth/login`, `/auth/me`).
+- Migration `0001_init_users_table.sql`.
+- 24 tests : 17 unitaires + 7 intégration (login réel, révocation, désactivation, contrainte email unique).
+
+Bug réel détecté et corrigé lors de la validation locale (non détectable en environnement de génération sans Docker) :
+- `tests/test_api.py` utilisait `fastapi.testclient.TestClient`, qui exécute l'application dans un thread séparé avec sa propre boucle asyncio. Le pool de connexions `asyncpg`, créé dans la boucle du test, devenait inutilisable depuis ce thread (`RuntimeError: ... attached to a different loop`). **Ce n'était pas un bug de l'API elle-même** (fonctionnelle sous Uvicorn en production), uniquement un défaut de l'outillage de test. Corrigé en remplaçant `TestClient` par `httpx.AsyncClient` + `ASGITransport`, qui exécute tout dans la même boucle asyncio que les fixtures — pattern actuellement recommandé pour tester une application ASGI de manière asynchrone.
+
+Validation finale effectuée sur la machine réelle du fondateur, contre une vraie instance PostgreSQL/TimescaleDB avec les migrations Brique 1 ET Brique 2 appliquées :
+- `uv run pytest -v` — **24/24 tests passés** (aucun skip, aucun échec).
+- `uv run ruff check .` / `uv run mypy src/` — propres.
+- Non-régression Briques 0 et 1 confirmée.
+
+**Brique 2 validée. Prête pour l'analyse de la Brique 3 (Générateur + ingestion de transactions synthétiques) dès demande explicite du fondateur.**
 
 ## Règle
 

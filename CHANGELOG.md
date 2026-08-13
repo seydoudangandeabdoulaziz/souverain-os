@@ -10,6 +10,19 @@ Le projet reste en `0.x` tant que le MVP n'est pas considéré comme stable.
 - Brique 0 — Fondations : socle Python/uv, Docker Compose socle, qualité de code (Ruff/mypy/pytest/pre-commit), documentation initiale.
 - ADR-000 : décision de reconstruction Greenfield.
 
+## [0.3.0] — 2026-08-13
+
+### Ajouté
+- Brique 2 — Auth / RBAC minimal + fondations SOUVERAIN-ID : hachage Argon2id, JWT HMAC-SHA256, révocation via `token_version`, RBAC 3 rôles, routeur `/auth/login` et `/auth/me`.
+
+### Corrigé
+- `verify_password()` : capture de `InvalidHashError` (hérite de `ValueError`, pas de `Argon2Error`).
+- Tests d'intégration : remplacement de `TestClient` (thread séparé, boucle asyncio incompatible avec le pool `asyncpg`) par `httpx.AsyncClient` + `ASGITransport`.
+- Ajout du marqueur `py.typed` à la Brique 1 pour exposer son typage aux packages dépendants.
+
+### Validé
+- Brique 2 : validée par le fondateur après tests réels contre une instance PostgreSQL (24/24 tests).
+
 ## [0.2.0] — 2026-08-13
 
 ### Ajouté
