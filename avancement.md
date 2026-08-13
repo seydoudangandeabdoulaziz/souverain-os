@@ -19,7 +19,7 @@ VALIDÉE
 | Brique | Nom | Statut |
 |---|---|---|
 | 0 | Fondations | **VALIDÉE** |
-| 1 | PostgreSQL / TimescaleDB | **EN VALIDATION** |
+| 1 | PostgreSQL / TimescaleDB | **VALIDÉE** |
 | 2 | Auth / RBAC | NON COMMENCÉE |
 | 3 | Générateur + ingestion | NON COMMENCÉE |
 | 4 | Détection Hybrid-Stream | NON COMMENCÉE |
@@ -75,7 +75,9 @@ Non inclus (explicitement exclu du périmètre de la Brique 0) :
 
 ## Détail — Brique 1 (PostgreSQL / TimescaleDB multi-tenant)
 
-**Statut : EN VALIDATION**
+**Statut : VALIDÉE**
+
+**Date de validation : 13 août 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
 
 Décision d'architecture actée : isolation **schema-per-tenant** (conforme au Bloc 9 du document fondateur).
 
@@ -85,19 +87,21 @@ Livré :
 - Pool de connexions asyncpg, configuration via `pydantic-settings`.
 - Healthcheck DB (connexion, extension TimescaleDB, schéma partagé).
 - Migration versionnée `0001_init_shared_schema.sql`.
-- Service `postgres` ajouté au `docker-compose.yml` racine sous le profile `postgres` (jamais lancé par défaut).
-- 15 tests : 13 unitaires (validation schéma, rendu SQL, configuration) + 2 tests d'intégration (auto-skip si PostgreSQL non démarré).
-- Qualité vérifiée : ruff, mypy — tous propres.
+- Service `postgres` dans `docker-compose.yml` racine sous le profile `postgres`.
 
-Vérifications effectuées dans l'environnement de génération (sans Docker/PostgreSQL disponible) :
-- `uv sync --package brique-01-postgresql` — OK.
-- Build du wheel — fichiers `.sql` correctement inclus (vérifié explicitement).
-- `uv run pytest -v` — 13 passed, 2 skipped (comportement attendu sans DB).
-- `uv run ruff check .` — All checks passed.
-- `uv run mypy src/` — Success, no issues found.
-- Non-régression Brique 0 — 6/6 tests toujours passants.
+Deux bugs réels détectés et corrigés lors de la vérification locale (non détectables en environnement de génération sans Docker) :
+1. `config.py` — résolution du fichier `.env` dépendante du répertoire d'exécution → corrigée pour remonter jusqu'à la racine du dépôt, quel que soit le dossier courant.
+2. `docker-compose.yml` — healthcheck `pg_isready` sans flag `-d`, ciblait une base inexistante → corrigé pour cibler explicitement `souverain_os`.
 
-**En attente : tests d'intégration contre une vraie instance PostgreSQL, à exécuter localement (`docker compose --profile postgres up -d`), puis validation explicite du fondateur avant passage à la Brique 2.**
+Validation finale effectuée sur la machine réelle du fondateur, contre une vraie instance PostgreSQL/TimescaleDB (pas de mock) :
+- `docker compose --profile postgres up -d` — conteneur `healthy`.
+- Migration `0001_init_shared_schema.sql` appliquée avec succès.
+- `uv run pytest -v` — **15/15 tests passés** (13 unitaires + 2 intégration, contre la vraie base).
+- `uv run python scripts/db_healthcheck.py` — **SAIN** (connexion, extension TimescaleDB 2.17.2, schéma partagé tous OK).
+- `uv run ruff check .` / `uv run mypy src/` — propres.
+- Non-régression Brique 0 confirmée.
+
+**Brique 1 validée. Prête pour l'analyse de la Brique 2 (Auth / RBAC minimal + fondations SOUVERAIN-ID) dès demande explicite du fondateur.**
 
 ## Règle
 

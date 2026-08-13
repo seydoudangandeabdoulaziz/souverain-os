@@ -1,6 +1,6 @@
 # Brique 1 — PostgreSQL / TimescaleDB multi-tenant
 
-**Statut : EN VALIDATION**
+**Statut : VALIDÉE**
 
 ## Rôle
 
@@ -123,4 +123,4 @@ PostgreSQL + TimescaleDB en conteneur (~150-250 Mo au repos) + pool de connexion
 
 ## Note sur les tests
 
-Cette brique a été **écrite et vérifiée statiquement** (ruff, mypy, tests unitaires purs) dans l'environnement de génération, qui ne dispose pas de Docker/PostgreSQL. **Les tests d'intégration contre une vraie instance PostgreSQL doivent être exécutés localement**, avec Docker démarré, avant validation finale de cette brique.
+**Brique validée le 13 août 2026** contre une vraie instance PostgreSQL/TimescaleDB (pas de mock), sur ThinkPad X1 Carbon Gen 6 : 15/15 tests passés (13 unitaires + 2 intégration), healthcheck SAIN, ruff et mypy propres.
