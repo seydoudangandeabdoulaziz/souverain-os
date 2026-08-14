@@ -31,6 +31,8 @@ dependencies = []
 members = [
     "briques/brique_00_fondations",
     "briques/brique_01_postgresql",
+    "briques/brique_02_auth_rbac",
+    "briques/brique_03_generateur_ingestion",
 ]
 
 [tool.ruff]
