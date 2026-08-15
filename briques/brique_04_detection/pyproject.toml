@@ -1,0 +1,50 @@
+# ============================================================
+# Brique 4 — Moteur de détection Hybrid-Stream
+# ============================================================
+[project]
+name = "brique-04-detection"
+version = "0.1.0"
+description = "SOUVERAIN-OS — Brique 4 : moteur de détection Hybrid-Stream"
+requires-python = ">=3.12"
+dependencies = [
+    "brique-01-postgresql",
+    "asyncpg>=0.29",
+    "pydantic-settings>=2.4",
+]
+
+[tool.uv.sources]
+brique-01-postgresql = { workspace = true }
+# Dépendance de TEST uniquement (voir dependency-groups.dev) : réutilise
+# patterns_suspects.py pour générer des données labellisées en mémoire.
+# Jamais importée par le code runtime (moteur.py, regles/, cli.py).
+souverain-generateur = { workspace = true }
+
+[project.scripts]
+souverain-detecter = "brique_04_detection.cli:main"
+
+[dependency-groups]
+dev = [
+    "souverain-generateur",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.12"
+
+[[tool.mypy.overrides]]
+module = "asyncpg.*"
+ignore_missing_imports = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/brique_04_detection"]
+artifacts = ["*.sql", "py.typed"]

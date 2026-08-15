@@ -22,7 +22,7 @@ VALIDÉE
 | 1 | PostgreSQL / TimescaleDB | **VALIDÉE** |
 | 2 | Auth / RBAC | **VALIDÉE** |
 | 3 | Générateur + ingestion | **VALIDÉE** |
-| 4 | Détection Hybrid-Stream | NON COMMENCÉE |
+| 4 | Détection Hybrid-Stream | **VALIDÉE** |
 | 5 | Scoring + alertes | NON COMMENCÉE |
 | 6 | Neo4j | NON COMMENCÉE |
 | 7 | Dashboard / investigation | NON COMMENCÉE |
@@ -168,6 +168,41 @@ Validation finale effectuée sur la machine réelle du fondateur, contre une vra
 - Non-régression Briques 0, 1 et 2 confirmée.
 
 **Brique 3 validée. Prête pour l'analyse de la Brique 4 (Moteur de détection Hybrid-Stream) dès demande explicite du fondateur.**
+
+## Détail — Brique 4 (Moteur de détection Hybrid-Stream)
+
+**Statut : VALIDÉE**
+
+**Date de validation : 15 août 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+Décisions d'architecture actées (analyse validée avant implémentation) :
+- "Hybrid" = traitement batch en source (lecture SQL triée par `occurred_at`), mais séquentiel et état-plein dans le moteur — chaque règle reçoit les transactions une par une et maintient sa propre fenêtre glissante par compte. Une composante statistique/calibrée reste documentée comme Vision, hors périmètre MVP.
+- Sortie : table dédiée `{tenant}.detections`, migration portée par la Brique 4 (`0001_create_detections_table.sql`), même mécanique que `is_synthetic` en Brique 3 — ne modifie aucun fichier des briques précédentes.
+- Seuils MVP validés tels quels dès la première implémentation (structure étoile ≥ 6 destinataires/90min, compte pivot ≥ 3 réceptions puis ≥ 2 redistributions/60min, micro-fractionnement ≥ 10 transactions <1000 XOF/20min, nocturne ≥ 4 transactions 22h-4h, flux frontalier sans seuil).
+- Saisonnalité explicitement exclue des règles de détection MVP (facteur de contexte réservé à la Vision).
+- `is_synthetic` jamais utilisé comme critère de détection — même principe que `pattern_label` en Brique 3, pour que le moteur ne puisse pas "tricher".
+- Dépendance vers la Brique 3 (`patterns_suspects.py`) strictement scopée aux tests (`dev` dependency group), jamais importée en runtime.
+
+Limite MVP documentée explicitement :
+- La règle `flux_frontalier` ne détecte le motif Niamey→frontière que via la convention de nommage du générateur synthétique (`niamey_*`/`*frontiere*`) — un placeholder fonctionnel pour les données de test, pas une vraie détection géographique. Un référentiel compte→région réel est nécessaire en Vision.
+
+Livré :
+- `modeles.py` (TransactionObservee, DetectionEvent, indépendants de la Brique 3), `regles/base.py` (fenêtre glissante réutilisable), 5 règles à état (`structure_etoile.py`, `compte_pivot.py`, `micro_fractionnement.py`, `nocturne.py`, `flux_frontalier.py`), `moteur.py` (orchestration séquentielle), `lecture.py` (source batch triée), `persistence.py` (écriture + auto-réparation de la table), `cli.py` (`uv run souverain-detecter`).
+- Migration `0001_create_detections_table.sql`.
+- 15 tests : 13 unitaires (règles + moteur, réutilisent `patterns_suspects.py` de la Brique 3 en mémoire, jamais persisté avec label) + 2 intégration (contre une vraie instance PostgreSQL/TimescaleDB, tenant éphémère + lecture réelle sur les 5000 transactions de `tenant_ne`).
+
+Bug corrigé pendant la validation locale (non détectable en environnement de génération sans accès au dépôt réel) :
+- Le dépôt possède un dossier `tests/` à la racine du workspace (`tests/integration/`), entrant en collision avec `briques/brique_04_detection/tests/` quand `pytest` est invoqué depuis la racine — Python résolvait `import tests` vers le mauvais dossier. Corrigé en remplaçant l'import direct `from tests.conftest import ...` par une vraie fixture `pytest` dans `conftest.py`, immunisée contre ce type de collision de nom.
+- Erreur de nommage dans `pyproject.toml` de la Brique 4 : la dépendance de test vers la Brique 3 référençait `brique-03-generateur-ingestion`, alors que le nom réel du paquet déclaré dans `briques/brique_03_generateur_ingestion/pyproject.toml` est `souverain-generateur`. Corrigé.
+
+Validation finale effectuée sur la machine réelle du fondateur, contre une vraie instance PostgreSQL/TimescaleDB avec les migrations Briques 1, 3 et 4 appliquées, sur les 5000 transactions réelles de `tenant_ne` :
+- `uv run pytest` — **15/15 tests passés** (13 unitaires + 2 intégration).
+- `uv run ruff check briques/brique_04_detection` — All checks passed.
+- `uv run mypy src` (depuis le dossier de la brique) — Success, no issues found.
+- `uv run souverain-detecter --tenant tenant_ne` — **69 détections générées et enregistrées** dans `tenant_ne.detections` : compte_pivot (8), flux_frontalier (25), micro_fractionnement (4), structure_etoile (6), transactions_nocturnes (26). Répartition confirmée par requête SQL directe.
+- Non-régression Briques 0, 1, 2 et 3 confirmée.
+
+**Brique 4 validée. Prête pour l'analyse de la Brique 5 (Scoring + alertes) dès demande explicite du fondateur.**
 
 ## Règle
 

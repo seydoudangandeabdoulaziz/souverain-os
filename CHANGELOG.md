@@ -10,6 +10,19 @@ Le projet reste en `0.x` tant que le MVP n'est pas considéré comme stable.
 - Brique 0 — Fondations : socle Python/uv, Docker Compose socle, qualité de code (Ruff/mypy/pytest/pre-commit), documentation initiale.
 - ADR-000 : décision de reconstruction Greenfield.
 
+## [0.5.0] — 2026-08-15
+
+### Ajouté
+- Brique 4 — Moteur de détection Hybrid-Stream : 5 règles à état (structure en étoile, compte pivot, micro-fractionnement, transactions nocturnes, flux frontalier), traitement séquentiel sur source batch triée chronologiquement, table `{tenant}.detections`, CLI `souverain-detecter`.
+- `modeles.py` : `TransactionObservee`/`DetectionEvent`, découplés de la Brique 3 pour permettre un remplacement futur de la source (flux temps réel) sans toucher aux règles de détection.
+
+### Corrigé
+- Collision de module `tests` entre le dossier racine du workspace (`tests/integration/`) et celui de la Brique 4 : remplacement de l'import direct `from tests.conftest import ...` par une fixture `pytest` standard, immunisée contre ce type de conflit de nommage.
+- `pyproject.toml` de la Brique 4 : correction du nom de la dépendance de test vers la Brique 3 (`souverain-generateur`, et non `brique-03-generateur-ingestion`).
+
+### Validé
+- Brique 4 : validée par le fondateur après tests réels contre une instance PostgreSQL (15/15 tests) et détection réelle sur les 5000 transactions de `tenant_ne` (69 détections générées).
+
 ## [0.4.0] — 2026-08-15
 
 ### Ajouté
