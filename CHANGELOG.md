@@ -10,6 +10,20 @@ Le projet reste en `0.x` tant que le MVP n'est pas considéré comme stable.
 - Brique 0 — Fondations : socle Python/uv, Docker Compose socle, qualité de code (Ruff/mypy/pytest/pre-commit), documentation initiale.
 - ADR-000 : décision de reconstruction Greenfield.
 
+## [0.4.0] — 2026-08-15
+
+### Ajouté
+- Brique 3 — Générateur + ingestion de transactions synthétiques : génération de transactions Mobile Money légitimes et des 6 patterns criminels sahéliens (Bloc 7), insertion par lots dans le schéma tenant réel, CLI `souverain-generer`.
+- `scripts/bootstrap_tenant_ne.sql` : enregistrement MVP provisoire du tenant Niger dans `shared.tenants_registry`, en attendant `create_tenant()` (Brique 8).
+- Colonne `is_synthetic` sur `{tenant}.transactions`, avec auto-réparation idempotente à l'insertion.
+
+### Corrigé
+- `pyproject.toml` racine : ajout de `[tool.uv]` / `package = false`, corrigeant l'échec de `uv sync` (le projet racine n'a pas de code propre à construire, seulement un point d'ancrage de workspace).
+- Documentation de la commande correcte pour synchroniser tout le workspace : `uv sync --all-packages` (et non `uv sync` seul).
+
+### Validé
+- Brique 3 : validée par le fondateur après tests réels contre une instance PostgreSQL (21/21 tests) et génération réelle de 5000 transactions.
+
 ## [0.3.0] — 2026-08-13
 
 ### Ajouté

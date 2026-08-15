@@ -21,7 +21,7 @@ VALIDÉE
 | 0 | Fondations | **VALIDÉE** |
 | 1 | PostgreSQL / TimescaleDB | **VALIDÉE** |
 | 2 | Auth / RBAC | **VALIDÉE** |
-| 3 | Générateur + ingestion | NON COMMENCÉE |
+| 3 | Générateur + ingestion | **VALIDÉE** |
 | 4 | Détection Hybrid-Stream | NON COMMENCÉE |
 | 5 | Scoring + alertes | NON COMMENCÉE |
 | 6 | Neo4j | NON COMMENCÉE |
@@ -133,6 +133,41 @@ Validation finale effectuée sur la machine réelle du fondateur, contre une vra
 - Non-régression Briques 0 et 1 confirmée.
 
 **Brique 2 validée. Prête pour l'analyse de la Brique 3 (Générateur + ingestion de transactions synthétiques) dès demande explicite du fondateur.**
+
+## Détail — Brique 3 (Générateur + ingestion de transactions synthétiques)
+
+**Statut : VALIDÉE**
+
+**Date de validation : 15 août 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+Décisions d'architecture actées (analyse validée avant implémentation) :
+- Niveau de réalisme des patterns criminels sahéliens (Bloc 7) : Intermédiaire — paramétrable (intensité, fenêtre temporelle, montants), bruit contrôlé, seed fixe pour reproductibilité.
+- Mode de génération : batch (one-shot). Le mode stream continu reste porté par la Brique 4 (Hybrid-Stream).
+- Stockage : table `transactions` réelle de la Brique 1, colonne `is_synthetic` ajoutée par une migration portée par la Brique 3 (ne modifie aucun fichier de la Brique 1).
+- Déclenchement : CLI uniquement (`uv run souverain-generer`), pas d'endpoint API en MVP.
+- Volumétrie : configurable, défaut 5 000 transactions, jusqu'à 50 000 recommandé.
+- Tenant MVP : un seul (`tenant_ne`, Niger), `tenant_id` générique dans `inserer_transactions()` pour extension future.
+
+Dépendance réelle découverte et traitée pendant l'implémentation :
+- `{tenant}.transactions.tenant_id/country_code/data_classification` sont des colonnes `NOT NULL` référençant `shared.tenants_registry`, qui n'a aucun mécanisme d'enregistrement avant la Brique 8 (`create_tenant()` complet). Ajout d'un bootstrap MVP minimal et explicitement provisoire (`scripts/bootstrap_tenant_ne.sql`), à remplacer par la vraie gouvernance en Brique 8.
+
+Livré :
+- `generateur_legitime.py` (transactions Mobile Money légitimes, distribution log-normale des montants), `patterns_suspects.py` (6 patterns du Bloc 7 : nocturne, structure en étoile, micro-fractionnement, saisonnalité, flux frontalier, compte pivot), `ingestion.py` (insertion par lots de 500, réutilise `create_pool()`/`validate_schema_name()` de la Brique 1), `cli.py` (`uv run souverain-generer`), `config.py`.
+- Migration `0001_add_is_synthetic.sql` + auto-réparation de la colonne dans `inserer_transactions()` (idempotent, indépendant de l'ordre d'exécution de la migration).
+- `scripts/bootstrap_tenant_ne.sql`.
+- 21 tests : 15 unitaires (génération pure, sans DB) + 6 intégration (contre une vraie instance PostgreSQL/TimescaleDB, tenant éphémère provisionné et nettoyé automatiquement).
+
+Bug corrigé pendant la validation locale (non détectable en environnement de génération sans accès au dépôt réel) :
+- Le `pyproject.toml` racine faisait échouer `uv sync` (hatchling ne trouvait pas de répertoire correspondant au nom du projet racine, qui n'est qu'un point d'ancrage de workspace sans code propre). Corrigé par l'ajout de `[tool.uv]` / `package = false`. Découverte annexe : `uv sync` seul n'installe aucune brique du workspace, `uv sync --all-packages` est nécessaire.
+
+Validation finale effectuée sur la machine réelle du fondateur, contre une vraie instance PostgreSQL/TimescaleDB avec les migrations Briques 1, 2 et 3 appliquées, tenant `tenant_ne` bootstrapé et provisionné :
+- `uv run pytest` — **21/21 tests passés** (15 unitaires + 6 intégration).
+- `uv run ruff check briques/brique_03_generateur_ingestion` — All checks passed.
+- `uv run mypy src` (depuis le dossier de la brique) — Success, no issues found.
+- `uv run souverain-generer --tenant tenant_ne` — **5000 transactions insérées**, `is_synthetic = true` sur 5000/5000, répartition des canaux cohérente avec la configuration (55 % Orange Money, 30 % Airtel Money, 15 % Moov Money).
+- Non-régression Briques 0, 1 et 2 confirmée.
+
+**Brique 3 validée. Prête pour l'analyse de la Brique 4 (Moteur de détection Hybrid-Stream) dès demande explicite du fondateur.**
 
 ## Règle
 
