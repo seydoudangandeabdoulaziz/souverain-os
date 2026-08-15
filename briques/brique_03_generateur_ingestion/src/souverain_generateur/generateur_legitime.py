@@ -1,9 +1,13 @@
 """Génération de transactions Mobile Money légitimes (bruit de fond).
 
+CORRECTIF : les champs utilisent désormais sender_account/receiver_account,
+alignés sur le schéma réel de {tenant}.transactions (Brique 1,
+schema_tenant_template.sql) — la version précédente supposait à tort
+sender_id/receiver_id.
+
 Ce module ne connaît rien de la détection : il produit simplement des
 transactions plausibles, pour que les patterns suspects (patterns_suspects.py)
-ne soient pas les seules données du jeu de test — sinon la Brique 4 n'aurait
-rien à distinguer.
+ne soient pas les seules données du jeu de test.
 """
 
 from __future__ import annotations
@@ -28,13 +32,18 @@ DEVISE_UNIQUE = "XOF"  # Franc CFA — zone UEMOA
 class TransactionSynthetique:
     """Une transaction générée, prête à être insérée en base.
 
+    Noms de champs alignés sur {tenant}.transactions (Brique 1) :
+    sender_account / receiver_account, pas sender_id / receiver_id.
+
     pattern_label vaut None pour une transaction légitime, et le nom du
     pattern (ex. "structure_etoile") pour une transaction issue d'un
-    pattern suspect injecté volontairement.
+    pattern suspect injecté volontairement. Ce champ n'est JAMAIS
+    persisté en base (voir ingestion.py) — usage tests/validation
+    uniquement, pour ne pas biaiser la future détection (Brique 4).
     """
 
-    sender_id: str
-    receiver_id: str
+    sender_account: str
+    receiver_account: str
     amount: float
     currency: str
     channel: str
@@ -63,23 +72,15 @@ def _montant_legitime(rng: random.Random) -> float:
 def generer_transaction_legitime(
     rng: random.Random,
     base_time: datetime,
-    nb_comptes_pool: int = 2000,
 ) -> TransactionSynthetique:
-    """Génère une transaction légitime isolée.
-
-    nb_comptes_pool sert uniquement à borner l'espace des identifiants
-    générés pour ce lot — ce n'est pas une contrainte d'unicité stricte.
-    """
-    sender = identifiant_compte(rng)
-    receiver = identifiant_compte(rng)
-    decalage = timedelta(seconds=rng.randint(0, 24 * 3600))
+    """Génère une transaction légitime isolée."""
     return TransactionSynthetique(
-        sender_id=sender,
-        receiver_id=receiver,
+        sender_account=identifiant_compte(rng),
+        receiver_account=identifiant_compte(rng),
         amount=_montant_legitime(rng),
         currency=DEVISE_UNIQUE,
         channel=rng.choices(CANAUX, weights=POIDS_CANAUX, k=1)[0],
-        occurred_at=base_time + decalage,
+        occurred_at=base_time + timedelta(seconds=rng.randint(0, 24 * 3600)),
         pattern_label=None,
     )
 

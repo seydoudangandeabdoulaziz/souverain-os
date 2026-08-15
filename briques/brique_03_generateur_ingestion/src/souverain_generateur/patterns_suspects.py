@@ -53,8 +53,8 @@ def generer_transactions_nocturnes(
         decalage = timedelta(minutes=rng.randint(0, 6 * 60))  # 22h → 4h
         transactions.append(
             TransactionSynthetique(
-                sender_id=compte_dormant,
-                receiver_id=identifiant_compte(rng),
+                sender_account=compte_dormant,
+                receiver_account=identifiant_compte(rng),
                 amount=round(rng.uniform(20_000, 150_000), 2),
                 currency=DEVISE_UNIQUE,
                 channel=rng.choice(["orange_money", "airtel_money"]),
@@ -82,8 +82,8 @@ def generer_structure_etoile(
         montant = rng.uniform(30_000, 80_000) * rng.uniform(0.8, 1.2)  # bruit ±20%
         transactions.append(
             TransactionSynthetique(
-                sender_id=emetteur,
-                receiver_id=identifiant_compte(rng),
+                sender_account=emetteur,
+                receiver_account=identifiant_compte(rng),
                 amount=round(montant, 2),
                 currency=DEVISE_UNIQUE,
                 channel=rng.choice(["orange_money", "airtel_money", "moov_money"]),
@@ -110,8 +110,8 @@ def generer_micro_fractionnement(
         decalage = timedelta(seconds=rng.randint(0, 20 * 60))
         transactions.append(
             TransactionSynthetique(
-                sender_id=emetteur,
-                receiver_id=receveur,
+                sender_account=emetteur,
+                receiver_account=receveur,
                 amount=round(rng.uniform(200, 950), 2),
                 currency=DEVISE_UNIQUE,
                 channel="orange_money",
@@ -141,8 +141,8 @@ def generer_saisonnalite(
         decalage = timedelta(hours=rng.randint(-48, 48))
         transactions.append(
             TransactionSynthetique(
-                sender_id=identifiant_compte(rng),
-                receiver_id=identifiant_compte(rng),
+                sender_account=identifiant_compte(rng),
+                receiver_account=identifiant_compte(rng),
                 amount=round(rng.uniform(5_000, 60_000), 2),
                 currency=DEVISE_UNIQUE,
                 channel=rng.choice(["orange_money", "airtel_money", "moov_money"]),
@@ -166,8 +166,8 @@ def generer_flux_frontalier(
         decalage = timedelta(hours=rng.randint(0, 12))
         transactions.append(
             TransactionSynthetique(
-                sender_id=identifiant_compte(rng, "niamey"),
-                receiver_id=identifiant_compte(rng, rng.choice(zones)),
+                sender_account=identifiant_compte(rng, "niamey"),
+                receiver_account=identifiant_compte(rng, rng.choice(zones)),
                 amount=round(rng.uniform(40_000, 200_000), 2),
                 currency=DEVISE_UNIQUE,
                 channel=rng.choice(["orange_money", "airtel_money"]),
@@ -196,8 +196,8 @@ def generer_compte_pivot(
         decalage = timedelta(minutes=rng.randint(0, 30))
         transactions.append(
             TransactionSynthetique(
-                sender_id=identifiant_compte(rng),
-                receiver_id=pivot,
+                sender_account=identifiant_compte(rng),
+                receiver_account=pivot,
                 amount=round(rng.uniform(30_000, 100_000), 2),
                 currency=DEVISE_UNIQUE,
                 channel=rng.choice(["orange_money", "airtel_money"]),
@@ -211,8 +211,8 @@ def generer_compte_pivot(
         decalage = timedelta(minutes=rng.randint(30, 60))
         transactions.append(
             TransactionSynthetique(
-                sender_id=pivot,
-                receiver_id=identifiant_compte(rng),
+                sender_account=pivot,
+                receiver_account=identifiant_compte(rng),
                 amount=round(rng.uniform(20_000, 90_000), 2),
                 currency=DEVISE_UNIQUE,
                 channel=rng.choice(["orange_money", "airtel_money"]),

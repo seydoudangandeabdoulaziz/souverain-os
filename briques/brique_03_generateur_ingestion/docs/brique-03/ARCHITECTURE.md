@@ -3,109 +3,103 @@
 ## Position dans le pipeline
 
 ```text
-[Brique 1: PostgreSQL/TimescaleDB]   [Brique 2: Auth/RBAC]
-              │                              │
-              └──────────────┬───────────────┘
-                              ▼
-              [Brique 3: Générateur + ingestion]
-                              │
-                    (transactions marquées
-                     is_synthetic = true,
-                     dans le schéma tenant réel)
-                              ▼
-              [Brique 4: Détection Hybrid-Stream]  ← consommateur futur
+[Brique 1: PostgreSQL/TimescaleDB]
+    ├── connection.create_pool()/close_pool()   ← réutilisé tel quel
+    ├── tenant_provisioning.validate_schema_name() ← réutilisé tel quel
+    └── schema_tenant_template.sql               ← colonnes réelles suivies
+              │
+              ▼
+[Brique 3: Générateur + ingestion]
+    ├── scripts/bootstrap_tenant_ne.sql  (provisoire, remplacé en Brique 8)
+    ├── generateur_legitime.py + patterns_suspects.py  (purs, sans DB)
+    └── ingestion.py  (seul module qui touche asyncpg)
+              │
+              ▼
+[Brique 4: Détection Hybrid-Stream]  ← consommateur futur
 ```
 
-La Brique 3 ne dépend que de la Brique 1 (schéma, pool de connexions) et,
-indirectement, de la Brique 2 pour l'usage futur si un endpoint API venait
-à être ajouté (non retenu en MVP — voir décision "Déclenchement").
-
-## Flux interne
+## Flux interne (inchangé sur le fond, corrigé sur les colonnes)
 
 ```text
-cli.py (point d'entrée)
+cli.py
+    │
+    ├─► brique_01_postgresql.connection.create_pool()
+    │        (réutilise PostgresSettings, POSTGRES_* du .env)
     │
     ├─► generateur_legitime.generer_lot_legitime()
-    │        → transactions "bruit de fond", pattern_label=None
+    │        → sender_account/receiver_account, pattern_label=None
     │
     ├─► patterns_suspects.generer_*()
-    │        → transactions issues des 6 patterns du Bloc 7,
-    │          pattern_label renseigné (usage tests uniquement,
-    │          jamais stocké en base)
+    │        → sender_account/receiver_account, pattern_label renseigné
+    │          (jamais persisté en base)
     │
-    ├─► mélange + shuffle (seed) des deux lots
+    ├─► mélange + shuffle (seed)
     │
-    └─► ingestion.inserer_transactions(pool, tenant, transactions)
-             → INSERT par lots de 500, dans une transaction SQL par lot
-             → colonne is_synthetic = true systématique
+    └─► ingestion.inserer_transactions(pool, "tenant_ne", transactions)
+             ├─► recuperer_metadonnees_tenant()
+             │      lookup shared.tenants_registry → tenant_id/country_code/
+             │      data_classification (colonnes NOT NULL du vrai schéma)
+             ├─► ADD COLUMN IF NOT EXISTS is_synthetic (auto-réparateur)
+             └─► INSERT par lots de 500, colonnes réelles :
+                  transaction_id, tenant_id, country_code, data_classification,
+                  amount, currency, sender_account, receiver_account, channel,
+                  occurred_at, is_synthetic
 ```
 
-## Pourquoi séparer génération et ingestion (deux modules distincts) ?
+## Pourquoi la dépendance vers `shared.tenants_registry` était invisible au départ
 
-**Analogie :** c'est la différence entre écrire un scénario (génération) et
-le jouer devant une caméra (ingestion). On veut pouvoir tester le scénario
-seul — vérifier que la structure en étoile a bien 8 destinataires en 60
-minutes — sans jamais toucher à une base de données. C'est pour ça que
-`generateur_legitime.py` et `patterns_suspects.py` sont 100% purs (aucun
-import réseau/DB), testables en quelques millisecondes, alors que
-`ingestion.py` est le seul module qui touche à `asyncpg`.
+**Analogie :** le schéma `{tenant}.transactions` n'est pas une simple table
+"par pays" — chaque ligne insérée doit pouvoir prouver, via `tenant_id`,
+`country_code` et `data_classification`, à quel tenant *enregistré* elle
+appartient. C'est la différence entre écrire une adresse sur une enveloppe
+(le schéma physique suffit) et l'envoyer via un service postal qui vérifie
+que le destinataire existe dans son registre (le tenant doit être enregistré
+avant qu'on puisse lui envoyer quoi que ce soit).
 
-Conséquence directe : 15 tests unitaires sur 100% de la logique métier
-s'exécutent sans Docker, en moins de 50 ms — seuls les tests d'intégration
-de `ingestion.py` nécessitent une vraie instance PostgreSQL.
+Cette vérification n'existait dans aucun code visible avant l'implémentation
+réelle, parce que la Brique 1 s'arrête volontairement à la mécanique
+technique (`provision_tenant_schema()`), et que la gouvernance complète
+(`create_tenant()`) est réservée à la Brique 8. La Brique 3 est la première
+à avoir besoin d'un tenant *utilisable de bout en bout* — d'où la découverte
+du trou à ce moment précis, pas avant.
 
-## Reproductibilité (seed)
+## Le bootstrap MVP (`scripts/bootstrap_tenant_ne.sql`)
 
-Chaque fonction de génération accepte un `random.Random` initialisé avec une
-seed. Même seed + mêmes paramètres ⇒ mêmes transactions, au bit près. C'est
-ce qui permettra, en Brique 4, d'écrire des tests du type : "avec la seed 42
-et l'intensité forte, le détecteur doit repérer au moins 95% des transactions
-marquées `structure_etoile`" — un test de non-régression sur la qualité de
-détection, reproductible indéfiniment.
+Volontairement minimal : un seul `INSERT ... ON CONFLICT DO NOTHING`, pas de
+fonction Python, pas de validation métier, pas d'audit. Il ne doit **jamais**
+être généralisé à d'autres tenants sans passer par la Brique 8 — le
+commentaire en tête du fichier le rappelle explicitement pour éviter qu'il
+devienne, par facilité, le mécanisme de fait de création de tenants.
 
-## Pourquoi `pattern_label` n'est jamais stocké en base
+## Auto-réparation de la colonne `is_synthetic`
 
-Si la colonne existait en base, la Brique 4 pourrait "tricher" en la lisant
-directement au lieu de détecter réellement le pattern à partir du
-comportement transactionnel — biaisant tout test de qualité de détection.
-`pattern_label` reste donc uniquement en mémoire côté génération/tests
-Python, jamais persistée.
-
-## Fuseau horaire
-
-Le Niger est en WAT (UTC+1, fixe, sans changement d'heure). Tous les
-horodatages générés sont conscients du fuseau (`FUSEAU_NIGER`), cohérent
-avec une colonne `occurred_at` probablement de type `timestamptz` côté
-TimescaleDB (bonne pratique standard pour une hypertable).
+`inserer_transactions()` exécute `ADD COLUMN IF NOT EXISTS` avant chaque
+insertion, en plus de la migration `0001_add_is_synthetic.sql`. Nécessaire
+car la migration ne boucle que sur les tenants *déjà enregistrés* au moment
+où elle s'exécute — un tenant provisionné après coup (typiquement en test)
+ne serait pas couvert sans cette sécurité. Coût négligible : `ADD COLUMN IF
+NOT EXISTS` est un no-op quasi instantané si la colonne existe déjà.
 
 ## Sécurité — implications de cette brique
 
-- **Injection SQL sur le nom de schéma** : `nom_schema_tenant` provient d'un
-  argument CLI (`--tenant`), donc potentiellement d'une saisie humaine.
-  `_valider_nom_schema()` rejette tout ce qui n'est pas alphanumérique/underscore
-  avant de l'interpoler dans la requête SQL — même précaution que
-  `provision_tenant_schema()` en Brique 1.
-- **Aucune donnée personnelle réelle** : tous les identifiants (`cpt_XXXXXX`,
-  `hub_XXXXXX`, `pivot_XXXXXX`) sont générés, sans lien avec des personnes
-  physiques — pas d'enjeu RGPD/Loi 2019-33 Niger pour cette brique.
-- **Traçabilité** : `is_synthetic = true` permet un audit ultérieur (Brique 8)
-  distinguant clairement les données de test des données réelles, et une
-  purge propre avant tout déploiement en production.
+- Validation anti-injection réutilisée de la Brique 1 (`validate_schema_name`).
+- Aucune donnée personnelle réelle.
+- `is_synthetic` : traçabilité et purge propres.
+- Le bootstrap MVP est scellé, documenté et scopé à `tenant_ne` uniquement.
 
 ## Dépendances vers les briques futures
 
 | Brique | Dépendance |
 |---|---|
-| 4 — Détection Hybrid-Stream | Consommera les transactions `is_synthetic=true` en mode batch pour ses premiers tests. Le passage à un flux continu réel sera porté par la Brique 4 elle-même (décision actée : pas de stream dans cette brique). |
-| 5 — Scoring + alertes | Pourra utiliser `pattern_label` (côté tests Python uniquement) pour mesurer le taux de faux positifs/négatifs du scoring sur un jeu de données connu. |
-| 6 — Neo4j | Les patterns `structure_etoile` et `compte_pivot` produisent des sous-graphes reconnaissables (1 hub → N destinataires ; N sources → pivot → M destinations), directement exploitables pour tester les requêtes Cypher. |
-| 8 — Audit | `is_synthetic` est le point d'ancrage pour tout hook d'audit qui devrait distinguer données réelles et données de test. |
+| 4 — Détection Hybrid-Stream | Consomme les transactions `is_synthetic=true` en mode batch. |
+| 6 — Neo4j | `structure_etoile`/`compte_pivot` → sous-graphes reconnaissables. |
+| 8 — Audit + gouvernance | **Doit remplacer** `scripts/bootstrap_tenant_ne.sql` par un vrai `create_tenant()`. Point de vigilance explicite à reprendre à ce moment-là. |
 
 ## Points explicitement hors périmètre (Vision)
 
 - Calibrage statistique des patterns sur données réelles GIABA/UNODC
-- Comportement adaptatif des acteurs simulés (réseau qui change de stratégie)
+- Comportement adaptatif des acteurs simulés
 - Génération multi-tenant simultanée
 - Mode stream continu (porté par la Brique 4)
-- Endpoint API de déclenchement (RBAC) — pourra être ajouté en Brique 7/8 si
-  un besoin réel apparaît (ex. génération à la demande depuis le dashboard)
+- Endpoint API de déclenchement (RBAC)
+- Gouvernance complète de création de tenant (Brique 8)

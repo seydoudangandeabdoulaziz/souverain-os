@@ -1,15 +1,12 @@
 -- Brique 3 — Générateur + ingestion de transactions synthétiques
 -- Migration portée par la Brique 3 (ne modifie AUCUN fichier de la Brique 1).
 --
--- Rôle : ajouter une colonne is_synthetic sur la table transactions de chaque
--- tenant existant, pour pouvoir distinguer/purger les données de test des
--- données réelles, sans jamais mélanger les deux silencieusement.
+-- Rôle : ajouter une colonne is_synthetic sur la table transactions de
+-- chaque tenant existant, pour distinguer/purger les données de test
+-- des données réelles.
 --
--- HYPOTHÈSE À VÉRIFIER : ce script suppose que shared.tenants_registry
--- contient une colonne nommée "schema_name" identifiant le schéma PostgreSQL
--- de chaque tenant (posé en Brique 1). Si le nom réel de cette colonne est
--- différent dans ton schéma, adapte la ligne SELECT ci-dessous avant
--- d'exécuter cette migration.
+-- Confirmé contre le vrai schéma (shared.tenants_registry.schema_name,
+-- Brique 1, migrations/0001_init_shared_schema.sql) — plus une hypothèse.
 
 DO $$
 DECLARE
@@ -28,3 +25,9 @@ END $$;
 
 -- Rétrocompatible : DEFAULT false ⇒ aucune transaction réelle existante n'est affectée.
 -- Idempotent : ADD COLUMN IF NOT EXISTS ⇒ rejouable sans erreur.
+--
+-- ⚠️ ORDRE D'EXÉCUTION : cette migration doit être jouée APRÈS le
+-- bootstrap MVP (scripts/bootstrap_tenant_ne.sql) ET après le
+-- provisionnement physique du schéma tenant_ne (sinon la boucle
+-- ci-dessus ne trouve aucun schéma à altérer — pas d'erreur, mais
+-- rien n'est fait). Voir README.md, section "Ordre d'exécution".

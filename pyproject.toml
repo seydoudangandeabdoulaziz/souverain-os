@@ -8,7 +8,6 @@
 # Option A — workspace uv avec dépendances isolées par brique,
 # lockfile unique racine résolvant l'ensemble du graphe.
 # ============================================================
-
 [project]
 name = "souverain-os"
 version = "0.1.0"
@@ -16,10 +15,12 @@ description = "SOUVERAIN-OS — Système immunitaire numérique africain (worksp
 requires-python = ">=3.12"
 readme = "README.md"
 license = { text = "Proprietary" }
-
 # Le projet racine ne contient aucune dépendance métier.
 # C'est un point d'ancrage pour le workspace uv uniquement.
 dependencies = []
+
+[tool.uv]
+package = false
 
 [tool.uv.workspace]
 # Liste EXPLICITE des briques implémentées (pas un glob "briques/*").

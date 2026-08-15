@@ -28,8 +28,8 @@ def test_transactions_nocturnes_sont_entre_22h_et_4h() -> None:
 def test_structure_etoile_un_seul_emetteur_plusieurs_destinataires() -> None:
     rng = random.Random(2)
     transactions = generer_structure_etoile(rng, BASE_TIME)
-    emetteurs = {t.sender_id for t in transactions}
-    destinataires = {t.receiver_id for t in transactions}
+    emetteurs = {t.sender_account for t in transactions}
+    destinataires = {t.receiver_account for t in transactions}
     assert len(emetteurs) == 1
     assert len(destinataires) >= 6  # cohérent avec l'intensité "moyenne" par défaut
     assert len(destinataires) == len(transactions)  # pas de doublon de destinataire
@@ -53,8 +53,8 @@ def test_micro_fractionnement_montants_sous_le_seuil() -> None:
 def test_micro_fractionnement_meme_paire_emetteur_recepteur() -> None:
     rng = random.Random(3)
     transactions = generer_micro_fractionnement(rng, BASE_TIME)
-    emetteurs = {t.sender_id for t in transactions}
-    recepteurs = {t.receiver_id for t in transactions}
+    emetteurs = {t.sender_account for t in transactions}
+    recepteurs = {t.receiver_account for t in transactions}
     assert len(emetteurs) == 1
     assert len(recepteurs) == 1
 
@@ -63,8 +63,8 @@ def test_flux_frontalier_vise_des_zones_frontalieres() -> None:
     rng = random.Random(4)
     transactions = generer_flux_frontalier(rng, BASE_TIME)
     for t in transactions:
-        assert "frontiere" in t.receiver_id
-        assert t.sender_id.startswith("niamey_")
+        assert "frontiere" in t.receiver_account
+        assert t.sender_account.startswith("niamey_")
 
 
 def test_compte_pivot_reception_puis_redistribution_sous_une_heure() -> None:
@@ -79,8 +79,8 @@ def test_compte_pivot_reception_puis_redistribution_sous_une_heure() -> None:
     assert len(receptions) >= 3
     assert len(redistributions) >= 2
 
-    pivots_reception = {t.receiver_id for t in receptions}
-    pivots_redistribution = {t.sender_id for t in redistributions}
+    pivots_reception = {t.receiver_account for t in receptions}
+    pivots_redistribution = {t.sender_account for t in redistributions}
     assert pivots_reception == pivots_redistribution  # même compte pivot des deux côtés
 
     dernier_horodatage_reception = max(t.occurred_at for t in receptions)

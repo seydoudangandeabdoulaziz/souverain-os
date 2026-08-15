@@ -1,14 +1,19 @@
-"""CLI de la Brique 3 — déclenchement manuel, réservé machine de dev (décision
-actée : pas d'endpoint API en MVP, cf. docs/brique-03/ARCHITECTURE.md).
+"""CLI de la Brique 3 — déclenchement manuel, réservé machine de dev.
+
+CORRECTIF majeur : réutilise désormais create_pool()/close_pool()/
+get_settings() de la Brique 1 au lieu de recréer une connexion autonome
+avec une DATABASE_URL supposée. Le tenant par défaut est "tenant_ne"
+(convention réelle du dépôt), plus "tenant_001".
+
+Prérequis avant le premier lancement (voir README.md) :
+1. docker compose --profile postgres up -d
+2. Migration Brique 1 appliquée (shared.tenants_registry existe)
+3. scripts/bootstrap_tenant_ne.sql joué (enregistre tenant_ne)
+4. Schéma tenant_ne physiquement provisionné (provision_tenant_schema)
+5. migrations/0001_add_is_synthetic.sql de cette brique appliquée
 
 Usage :
-    uv run souverain-generer --tenant tenant_001 --nb-transactions 5000
-
-HYPOTHÈSE À VÉRIFIER : la création du pool asyncpg ci-dessous est
-autonome (asyncpg.create_pool direct) pour ne pas supposer un module
-partagé précis. Si la Brique 1 expose déjà une fonction de création de
-pool réutilisable (probable, vu le pattern déjà en place), remplace
-_creer_pool() par un import de cette fonction pour éviter la duplication.
+    uv run souverain-generer --tenant tenant_ne
 """
 
 from __future__ import annotations
@@ -18,9 +23,9 @@ import asyncio
 import random
 from datetime import datetime
 
-import asyncpg
+from brique_01_postgresql.connection import close_pool, create_pool
 
-from souverain_generateur.config import ParametresGenerateur
+from souverain_generateur.config import get_generateur_settings
 from souverain_generateur.generateur_legitime import (
     FUSEAU_NIGER,
     TransactionSynthetique,
@@ -36,13 +41,18 @@ from souverain_generateur.patterns_suspects import (
 )
 
 VOLUMETRIE_MAX_RECOMMANDEE = 50_000
+TENANT_DEFAUT = "tenant_ne"
 
 
 def _construire_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Génère et insère des transactions synthétiques SOUVERAIN-OS."
     )
-    parser.add_argument("--tenant", required=True, help="Nom du schéma tenant (ex: tenant_001)")
+    parser.add_argument(
+        "--tenant",
+        default=TENANT_DEFAUT,
+        help=f"Nom du schéma tenant (défaut : {TENANT_DEFAUT})",
+    )
     parser.add_argument(
         "--nb-transactions",
         type=int,
@@ -87,17 +97,8 @@ def _generer_transactions_suspectes(
     return resultat[:nb_cible] if len(resultat) > nb_cible else resultat
 
 
-async def _creer_pool(dsn: str) -> asyncpg.Pool:
-    return await asyncpg.create_pool(dsn=dsn, min_size=1, max_size=5)
-
-
 async def executer(args: argparse.Namespace) -> None:
-    # Ignore mypy ci-dessous nécessaire : pydantic-settings remplit database_url
-    # depuis .env à l'exécution, mais mypy ne le sait pas sans le plugin
-    # pydantic.mypy. Si le mypy.ini / pyproject.toml racine active déjà ce
-    # plugin (probable, vu que les Briques 1 et 2 sont "mypy clean" avec le
-    # même pattern), l'ignore ci-dessous devient inutile et peut être retiré.
-    parametres = ParametresGenerateur()  # type: ignore[call-arg]
+    parametres = get_generateur_settings()
 
     nb_total = args.nb_transactions or parametres.nb_transactions_defaut
     if nb_total > VOLUMETRIE_MAX_RECOMMANDEE:
@@ -128,13 +129,16 @@ async def executer(args: argparse.Namespace) -> None:
         f"{len(transactions_suspectes)} suspectes (seed={seed}, intensité={args.intensite})"
     )
 
-    pool = await _creer_pool(parametres.database_url)
+    pool = await create_pool()  # réutilise PostgresSettings de la Brique 1 (POSTGRES_*)
     try:
         total_insere = await inserer_transactions(pool, args.tenant, toutes_transactions)
     finally:
-        await pool.close()
+        await close_pool()
 
-    print(f"✅ {total_insere} transactions insérées dans le schéma {args.tenant} (is_synthetic=true)")
+    print(
+        f"✅ {total_insere} transactions insérées dans le schéma {args.tenant} "
+        "(is_synthetic=true)"
+    )
 
 
 def main() -> None:

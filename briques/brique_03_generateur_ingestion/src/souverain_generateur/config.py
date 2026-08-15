@@ -1,54 +1,57 @@
-"""Configuration de la Brique 3.
+"""Configuration de la Brique 3 — paramètres de GÉNÉRATION uniquement.
 
-Réutilise le même principe que les Briques 1 et 2 : le fichier .env est
-recherché en remontant l'arborescence depuis ce fichier, pour ne jamais
-dépendre du répertoire d'exécution (bug corrigé en Brique 1, cf. avancement.md).
+CORRECTIF : la version précédente redéfinissait sa propre connexion DB
+(DATABASE_URL). C'était une supposition erronée — la Brique 1 fournit déjà
+PostgresSettings/get_settings() (préfixe POSTGRES_) et create_pool(), qu'il
+faut réutiliser tel quel (voir cli.py). Ce fichier ne gère donc plus QUE
+les paramètres propres à la génération de données synthétiques.
 
-HYPOTHÈSE À VÉRIFIER : si la Brique 1 expose déjà un utilitaire
-_find_env_file() partagé (par ex. dans un module `shared`), remplace la
-fonction ci-dessous par un import de cet utilitaire pour éviter la
-duplication. Je n'ai pas eu accès au code réel de la Brique 1 pour vérifier
-son emplacement exact.
+Pattern identique aux Briques 1 et 2 (config.py) : classe BaseSettings
+dédiée avec son propre préfixe, _find_env_file() dupliqué localement —
+c'est la convention déjà en place dans ce dépôt, pas une improvisation.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-def _find_env_file(nom_fichier: str = ".env") -> Path | None:
-    """Remonte l'arborescence depuis ce fichier jusqu'à trouver .env.
-
-    Évite le piège classique : un .env non trouvé parce que la commande
-    a été lancée depuis un sous-dossier plutôt que depuis la racine du repo.
+def _find_env_file() -> str | None:
+    """Identique au pattern des Briques 1 et 2 : remonte l'arborescence
+    depuis ce fichier pour trouver le .env à la racine du dépôt.
     """
-    courant = Path(__file__).resolve()
-    for parent in [courant, *courant.parents]:
-        candidat = parent / nom_fichier
-        if candidat.is_file():
-            return candidat
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / ".env"
+        if candidate.is_file():
+            return str(candidate)
     return None
 
 
-class ParametresGenerateur(BaseSettings):
-    """Paramètres de connexion et de génération, chargés depuis .env."""
+_ENV_FILE = _find_env_file()
+
+
+class GenerateurSettings(BaseSettings):
+    """Paramètres par défaut de génération (surchargeables en CLI)."""
 
     model_config = SettingsConfigDict(
-        env_file=_find_env_file(),
+        env_prefix="GENERATEUR_",
+        env_file=_ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
     )
 
-    database_url: str
-    """DSN PostgreSQL, ex : postgresql://user:pass@localhost:5432/souverain_os"""
+    seed_defaut: int = Field(default=42, description="Seed par défaut pour la reproductibilité")
+    nb_transactions_defaut: int = Field(
+        default=5_000, description="Volumétrie par défaut (jusqu'à 50 000 recommandé)"
+    )
+    pourcentage_suspect_defaut: float = Field(
+        default=5.0, description="Part de transactions issues des patterns suspects, en %"
+    )
 
-    seed_defaut: int = 42
-    """Seed par défaut pour la reproductibilité des générations."""
 
-    nb_transactions_defaut: int = 5_000
-    """Volumétrie par défaut d'une génération (configurable en CLI, jusqu'à 50 000)."""
-
-    pourcentage_suspect_defaut: float = 5.0
-    """Part de transactions issues des patterns suspects, en pourcentage."""
+def get_generateur_settings() -> GenerateurSettings:
+    """Point d'entrée unique pour récupérer la configuration de génération."""
+    return GenerateurSettings()

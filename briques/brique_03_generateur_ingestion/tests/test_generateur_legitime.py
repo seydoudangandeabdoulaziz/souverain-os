@@ -19,8 +19,8 @@ def test_generer_lot_legitime_est_reproductible_avec_meme_seed() -> None:
     lot_b = generer_lot_legitime(nb_transactions=50, seed=123, base_time=base_time)
 
     for transaction_a, transaction_b in zip(lot_a, lot_b, strict=True):
-        assert transaction_a.sender_id == transaction_b.sender_id
-        assert transaction_a.receiver_id == transaction_b.receiver_id
+        assert transaction_a.sender_account == transaction_b.sender_account
+        assert transaction_a.receiver_account == transaction_b.receiver_account
         assert transaction_a.amount == transaction_b.amount
         assert transaction_a.occurred_at == transaction_b.occurred_at
 
@@ -28,7 +28,7 @@ def test_generer_lot_legitime_est_reproductible_avec_meme_seed() -> None:
 def test_generer_lot_legitime_seeds_differentes_donnent_resultats_differents() -> None:
     lot_a = generer_lot_legitime(nb_transactions=50, seed=1)
     lot_b = generer_lot_legitime(nb_transactions=50, seed=2)
-    assert [t.sender_id for t in lot_a] != [t.sender_id for t in lot_b]
+    assert [t.sender_account for t in lot_a] != [t.sender_account for t in lot_b]
 
 
 def test_montants_toujours_positifs_et_bornes() -> None:
