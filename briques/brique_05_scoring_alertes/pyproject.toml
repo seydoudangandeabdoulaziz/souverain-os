@@ -1,0 +1,62 @@
+[project]
+name = "brique-05-scoring-alertes"
+version = "0.1.0"
+description = "SOUVERAIN-OS — Brique 5 : Scoring + Alertes"
+requires-python = ">=3.12"
+dependencies = [
+    "asyncpg>=0.29",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "brique-01-postgresql",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    # Dépendance vers la Brique 4 : STRICTEMENT en dev, pour réutiliser
+    # DetectionEvent en tests. Jamais importée en runtime.
+    # Nom exact vérifié contre briques/brique_04_detection/pyproject.toml
+    # pour éviter l'erreur de nommage déjà vécue en Brique 4
+    # (brique-03-generateur-ingestion vs souverain-generateur).
+    "brique-04-detection",
+]
+
+[project.scripts]
+souverain-scorer = "souverain_scoring.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/souverain_scoring"]
+
+[tool.uv.sources]
+brique-04-detection = { workspace = true }
+brique-01-postgresql = { workspace = true }
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# Le pool asyncpg (Brique 1) est un singleton partagé sur toute la
+# session de test (cf. fixture pool, scope="session"). Sans aligner
+# la boucle asyncio elle-même sur "session", pytest-asyncio crée une
+# nouvelle boucle par test par défaut — le pool créé dans la boucle
+# du premier test devient invalide ("attached to a different loop")
+# pour tous les tests suivants. Corrigé le 17/08/2026.
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+
+[tool.mypy]
+strict = true
+
+[[tool.mypy.overrides]]
+# asyncpg n'expose pas de marqueur py.typed. Même situation déjà
+# rencontrée dans les Briques 1/3/4 — à aligner avec la config mypy
+# racine si un override équivalent y existe déjà.
+module = "asyncpg.*"
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
