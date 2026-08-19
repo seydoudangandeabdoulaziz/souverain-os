@@ -35,7 +35,6 @@ members = [
     "briques/brique_02_auth_rbac",
     "briques/brique_03_generateur_ingestion",
     "briques/brique_04_detection",
-    "briques/brique_05_scoring_alertes",
 ]
 
 [tool.ruff]
