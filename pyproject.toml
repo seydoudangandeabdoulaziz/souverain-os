@@ -35,6 +35,7 @@ members = [
     "briques/brique_02_auth_rbac",
     "briques/brique_03_generateur_ingestion",
     "briques/brique_04_detection",
+    "briques/brique_05_scoring_alertes",
 ]
 
 [tool.ruff]
@@ -54,6 +55,8 @@ warn_return_any = true
 [tool.pytest.ini_options]
 testpaths = ["briques", "tests"]
 python_files = ["test_*.py"]
+asyncio_mode = "auto"
+addopts = "--import-mode=importlib"
 
 [build-system]
 requires = ["hatchling"]

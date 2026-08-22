@@ -23,7 +23,7 @@ VALIDÉE
 | 2 | Auth / RBAC | **VALIDÉE** |
 | 3 | Générateur + ingestion | **VALIDÉE** |
 | 4 | Détection Hybrid-Stream | **VALIDÉE** |
-| 5 | Scoring + alertes | NON COMMENCÉE |
+| 5 | Scoring + alertes | **VALIDÉE** |
 | 6 | Neo4j | NON COMMENCÉE |
 | 7 | Dashboard / investigation | NON COMMENCÉE |
 | 8 | Audit + Human-in-the-loop | NON COMMENCÉE |
@@ -203,6 +203,82 @@ Validation finale effectuée sur la machine réelle du fondateur, contre une vra
 - Non-régression Briques 0, 1, 2 et 3 confirmée.
 
 **Brique 4 validée. Prête pour l'analyse de la Brique 5 (Scoring + alertes) dès demande explicite du fondateur.**
+
+## Détail — Brique 5 (Scoring + alertes)
+
+**Statut : VALIDÉE**
+
+**Date de validation : 21 août 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+Décisions d'architecture actées (analyse validée avant implémentation) :
+- Granularité du score : `compte_pivot` seul (déjà renseigné par les 5 règles de la Brique 4). La fenêtre glissante n'est pas un axe de granularité séparé — un paramètre de la formule d'agrégation.
+- Fenêtre glissante : 7 jours (`FENETRE_JOURS`), provisoire.
+- Formule : somme pondérée par `pattern_type`, dédupliquée (un même pattern détecté N fois sur la fenêtre ne compte qu'une fois). Poids provisoires : `compte_pivot` (30), `structure_etoile` (25), `micro_fractionnement` (20), `transactions_nocturnes` (15), `flux_frontalier` (10).
+- Seuil d'alerte : 50 (`SEUIL_ALERTE`), provisoire — à recalibrer après la première exécution réelle sur `tenant_ne`.
+- Anti-doublon : une alerte `'ouverte'` par `compte_pivot`, mise à jour en place (UPSERT sur index unique partiel), jamais dupliquée. Une alerte `'fermee'` n'est jamais rouverte — une nouvelle détection franchissant à nouveau le seuil crée une nouvelle alerte (historique distinct, auditabilité).
+- Déclenchement : CLI uniquement (`uv run souverain-scorer`), pas d'endpoint API — contradiction avec le Bloc 10 du document fondateur signalée mais non réimplémentée, cohérence avec Briques 3/4.
+
+Correction actée pendant l'implémentation (avant toute validation, donc pas un bug de "validation locale" comme pour les briques précédentes — trouvé en écrivant les tests d'intégration) :
+- Une première version de `lecture.py` excluait les détections déjà "traitées" via une table de suivi (`{tenant}.detections_traitees`), pour éviter de recréer des alertes en double. Cette table a été retirée : elle cassait le score cumulatif sur la fenêtre glissante (une détection ancienne "déjà traitée" restait exclue des cycles suivants même si toujours dans la fenêtre de 7 jours). `lecture.py` relit désormais l'intégralité de la fenêtre à chaque cycle ; l'UPSERT sur l'index unique partiel de `{tenant}.alertes` reste la seule garantie anti-doublon, et suffit puisqu'il est idempotent.
+
+Bug réel détecté et corrigé lors de la validation locale (non détectable en environnement de génération sans accès à la vraie base du fondateur) :
+- `tenant_ne.alertes` existait déjà sur la base réelle avant l'application de la migration Brique 5 — vestige d'une tentative d'implémentation antérieure de cette même brique (schéma différent : colonnes `id`/`premiere_detection_at`/`derniere_detection_at`/`is_synthetic`, table de jonction séparée `alertes_detections`, index unique sur `(tenant_id, compte_pivot)` au lieu de `(compte_pivot)` seul). `CREATE TABLE IF NOT EXISTS` a silencieusement conservé cette ancienne table au lieu de créer celle du schéma validé (`NOTICE: relation "alertes" already exists, skipping`), faisant échouer toute vérification manuelle en aval (`column "pattern_types_impliques" does not exist`). Les deux tables résiduelles étaient vides (aucune donnée perdue) : corrigé par `DROP TABLE tenant_ne.alertes_detections` puis `DROP TABLE tenant_ne.alertes`, suivi d'une réapplication de `0001_create_alertes_table.sql`. Schéma résultant vérifié conforme (`\d tenant_ne.alertes`) avant de continuer.
+
+Livré :
+- `modeles.py` (`DetectionNonTraitee`, `ScoreCompte`, indépendants de `DetectionEvent` de la Brique 4), `seuils.py` (constantes provisoires isolées), `agregation.py` (fonction pure de calcul, dédup par pattern_type), `lecture.py` (lecture pleine fenêtre), `persistence.py` (UPSERT alerte + auto-réparation de la table), `cli.py` (`uv run souverain-scorer`).
+- Migration `0001_create_alertes_table.sql` (une seule table `alertes`, pas de `detections_traitees`).
+- 8 tests unitaires (`agregation.py`, sans DB) : tous exécutés en environnement de génération, **8/8 passés**. Couvrent la dédup multi-occurrences, les combinaisons de patterns franchissant/ne franchissant pas le seuil, un pattern lourd seul sous le seuil, plusieurs comptes distincts, le détail JSONB, et le cas défensif d'un `pattern_type` inconnu (poids 0, pas de crash).
+- 3 tests d'intégration (`test_integration.py`, contre vraie DB, tenant éphémère) : **non exécutés dans l'environnement de génération** (pas de PostgreSQL disponible) — à exécuter sur machine réelle avant validation. Couvrent le cycle complet, le rejeu du même cycle sans nouvelle détection (vérifie l'UPSERT plutôt qu'une exclusion en lecture), et le scénario exact du bug corrigé (détection ancienne toujours dans la fenêtre qui doit continuer à compter).
+
+Vérifié en environnement de génération (dépôt réel cloné, pas de suppositions sur le schéma) :
+- `uv sync --all-packages` — installation réussie, Brique 5 ajoutée à `[tool.uv.workspace].members`.
+- `uv run pytest briques/brique_05_scoring_alertes/tests/test_agregation.py` — **8/8 tests passés**.
+- `uv run ruff check briques/brique_05_scoring_alertes` — All checks passed (après `--fix` sur 8 erreurs mineures : alias `datetime.UTC`, un import inutilisé, un tri d'imports).
+- `uv run mypy src` (depuis le dossier de la brique) — Success, no issues found.
+- Non-régression Briques 0 à 4 : `uv run pytest` sur les suites unitaires (hors tests nécessitant une DB) des 5 briques précédentes — aucun échec imputable à la Brique 5 ; les échecs observés (connexion PostgreSQL refusée, plugin asyncio de la Brique 2) sont uniquement liés à l'absence de conteneur Docker dans cet environnement, déjà documentés comme limite de l'environnement de génération sur les briques précédentes.
+
+Vérifié sur la machine réelle du fondateur (ThinkPad X1 Carbon Gen 6), contre une vraie instance PostgreSQL/TimescaleDB :
+- `uv sync --all-packages` — installation réussie, Brique 5 ajoutée au workspace.
+- `docker compose --profile postgres up -d` — conteneur `healthy`.
+- Migration `0001_create_alertes_table.sql` appliquée (après correction du bug de table résiduelle ci-dessus).
+- `uv run pytest briques/brique_05_scoring_alertes/tests/test_integration.py -v -s` — **3/3 tests passés**, dont le test du scénario exact du bug de fenêtre glissante corrigé pendant l'implémentation.
+- `uv run ruff check briques/brique_05_scoring_alertes` — All checks passed.
+- `uv run mypy src` (depuis le dossier de la brique) — Success, no issues found.
+- `uv run souverain-scorer --tenant tenant_ne` — **69 détections lues, 51 comptes scorés, 0 alerte créée**. Confirmé correct par requête directe sur `tenant_ne.detections` : 18 comptes ont 2 patterns distincts sur la fenêtre actuelle, la meilleure combinaison réelle atteint 45/50 (`compte_pivot` + `transactions_nocturnes`) — aucun compte n'a encore 3 patterns distincts, donc 0 alerte est le résultat correct de la formule sur ce jeu de données, pas un défaut.
+- Non-régression Briques 0 à 4 confirmée (tests unitaires, hors dépendance DB).
+
+**Décision du fondateur sur le seuil, actée sans réserve :**
+0 alerte sur `tenant_ne` n'est pas un signe de sous-calibration. Le
+générateur de la Brique 3 utilise un préfixe de compte distinct et fixe
+par pattern (`hub_` → `structure_etoile`, `pivot_` → `compte_pivot`,
+`cpt_` → `micro_fractionnement`/`transactions_nocturnes`, `niamey_` →
+`flux_frontalier`) : un compte ne peut donc jamais cumuler deux patterns
+différents avec ce générateur, quel que soit le volume généré —
+augmenter le volume n'aurait rien changé. 0 alerte est le résultat
+mathématiquement correct de la formule contre les données actuelles.
+
+La formule elle-même reste validée indépendamment de cette contrainte :
+`test_agregation.py` construit ses combinaisons de patterns librement en
+mémoire (sans passer par le générateur), et `test_integration.py`
+construit directement des `DetectionEvent` multi-patterns sur un même
+compte contre une vraie base — les deux confirment que la formule
+fonctionne correctement dès qu'un compte cumule effectivement plusieurs
+patterns.
+
+Limite MVP documentée dans le README de la Brique 5 : le chemin complet
+"détection réelle → alerte réelle" n'est pas observable sur `tenant_ne`
+en l'état. Une évolution du générateur Brique 3 (scénario de test
+composite) pourrait lever cette limite plus tard — modification du code
+déjà validé de la Brique 3, nécessitant sa propre validation explicite,
+non traitée dans cette session.
+
+Bugs de configuration workspace détectés et corrigés pendant la vérification combinée post-validation (révélés par la Brique 5, mais pas des bugs de la Brique 5 elle-même — tracés ici comme pour les bugs réels des briques précédentes) :
+- **`asyncio_mode` manquant à la racine.** Chaque brique (`brique_01`, `brique_02`, `brique_04`, `brique_05`) déclare `asyncio_mode = "auto"` dans son propre `pyproject.toml`, mais la racine ne le déclarait pas. Lancer `uv run pytest` sur une seule brique fonctionnait (pytest résout alors le `pyproject.toml` de cette brique), mais lancer plusieurs briques ensemble depuis la racine faisait résoudre le `pyproject.toml` racine à la place — retombant sur le défaut `strict` de pytest-asyncio, qui casse les fixtures/tests async des Briques 1 et 2 (`db_settings_or_skip`, `test_require_role_*`). Corrigé par l'ajout de `asyncio_mode = "auto"` à `[tool.pytest.ini_options]` du `pyproject.toml` racine, aligné sur ce que chaque brique déclare déjà — aucun changement pour les runs scopés par brique.
+- **Collision d'import entre `test_integration.py` de la Brique 4 et de la Brique 5.** Une fois le bug ci-dessus corrigé, un second problème est apparu : aucun dossier `tests/` de brique ne contient de `__init__.py`, donc le mode d'import par défaut de pytest (`prepend`) importe chaque fichier de test comme un module de premier niveau nommé d'après son seul nom de fichier — deux briques ayant chacune un `test_integration.py` entrent en collision dès qu'elles sont testées dans la même session (`import file mismatch`). Corrigé par l'ajout de `addopts = "--import-mode=importlib"` au même bloc `[tool.pytest.ini_options]` : ce mode d'import identifie chaque module par son chemin de fichier complet plutôt que par son seul nom de base, éliminant la collision sans renommer aucun fichier de test ni toucher au contenu d'aucune brique précédente (une seule ligne, un seul fichier — le `pyproject.toml` racine, déjà en cours de correction pour le bug précédent).
+
+Les deux corrections confirmées sur la machine réelle du fondateur (`uv run pytest` sur les 6 briques 0 à 5 combinées, PostgreSQL démarré et sain) : **92/92 tests passés, 0 skip, 0 erreur.** Aucune régression sur les Briques 0 à 4, cycle complet de la Brique 5 vérifié de bout en bout.
+
+**Brique 5 validée. Prête pour l'analyse de la Brique 6 (Graphe Neo4j) dès demande explicite du fondateur.**
 
 ## Règle
 

@@ -13,6 +13,7 @@ members = [
     "brique-01-postgresql",
     "brique-02-auth-rbac",
     "brique-04-detection",
+    "brique-05-scoring-alertes",
     "souverain-generateur",
     "souverain-os",
 ]
@@ -336,6 +337,41 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.24" },
     { name = "ruff", specifier = ">=0.6" },
     { name = "souverain-generateur", editable = "briques/brique_03_generateur_ingestion" },
+]
+
+[[package]]
+name = "brique-05-scoring-alertes"
+version = "0.1.0"
+source = { editable = "briques/brique_05_scoring_alertes" }
+dependencies = [
+    { name = "asyncpg" },
+    { name = "brique-01-postgresql" },
+    { name = "pydantic-settings" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "brique-04-detection" },
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "asyncpg", specifier = ">=0.29" },
+    { name = "brique-01-postgresql", editable = "briques/brique_01_postgresql" },
+    { name = "pydantic-settings", specifier = ">=2.4" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "brique-04-detection", editable = "briques/brique_04_detection" },
+    { name = "mypy", specifier = ">=1.11" },
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+    { name = "ruff", specifier = ">=0.6" },
 ]
 
 [[package]]
