@@ -36,6 +36,7 @@ members = [
     "briques/brique_03_generateur_ingestion",
     "briques/brique_04_detection",
     "briques/brique_05_scoring_alertes",
+    "briques/brique_06_neo4j",
 ]
 
 [tool.ruff]

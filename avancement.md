@@ -24,7 +24,7 @@ VALIDÉE
 | 3 | Générateur + ingestion | **VALIDÉE** |
 | 4 | Détection Hybrid-Stream | **VALIDÉE** |
 | 5 | Scoring + alertes | **VALIDÉE** |
-| 6 | Neo4j | NON COMMENCÉE |
+| 6 | Neo4j | **VALIDÉE** |
 | 7 | Dashboard / investigation | NON COMMENCÉE |
 | 8 | Audit + Human-in-the-loop | NON COMMENCÉE |
 
@@ -279,6 +279,54 @@ Bugs de configuration workspace détectés et corrigés pendant la vérification
 Les deux corrections confirmées sur la machine réelle du fondateur (`uv run pytest` sur les 6 briques 0 à 5 combinées, PostgreSQL démarré et sain) : **92/92 tests passés, 0 skip, 0 erreur.** Aucune régression sur les Briques 0 à 4, cycle complet de la Brique 5 vérifié de bout en bout.
 
 **Brique 5 validée. Prête pour l'analyse de la Brique 6 (Graphe Neo4j) dès demande explicite du fondateur.**
+
+## Détail — Brique 6 (Graphe criminel Neo4j)
+
+**Statut : VALIDÉE**
+
+**Date de validation : 25 août 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+Décisions d'architecture actées (analyse validée avant implémentation) :
+- **Contradiction identifiée et tranchée avant tout code** : Neo4j Community Edition ne supporte qu'une seule base de données (multi-base = Enterprise), en tension avec l'exigence multi-tenant natif et le niveau d'isolation physique déjà obtenu en Brique 1 (schema-per-tenant). Deux options présentées ; Option A retenue — isolation logique par `tenant_id` sur chaque nœud/relation, une seule base. Option B (une instance Neo4j par tenant) écartée : contredit le principe fondateur "ajouter un pays = ajouter un tenant, pas réécrire le système".
+- **Point de passage unique** : `garde_isolation.py` est le seul fichier autorisé à contenir du Cypher (générique et métier confondus) — `requetes.py` ne fait que traduire ses résultats bruts en objets typés, `cli.py` n'appelle jamais Neo4j directement. Discipline documentée en tête de fichier : chaque `MATCH` filtre `tenant_id` sur tous les nœuds, y compris après plusieurs sauts ; double vérification défensive `ALL(...)` sur les traversées à longueur variable ; contrainte de schéma composite `(tenant_id, compte_id)` en renfort (vérifiée disponible en Community Edition).
+- **Modèle** : pas de nœud `Transaction` séparé, chaque transaction est une relation `:ENVOIE`. `transaction_id` comme clé du `MERGE`, documenté comme reposant sur son unicité garantie (UUID Brique 1), pas une supposition implicite.
+- **Portée du graphe** : import complet de `{tenant}.transactions` (pas seulement les comptes déjà détectés) — limite MVP documentée explicitement (import incrémental = Vision, coûteux à l'échelle UEMOA).
+- **Double dépendance de lecture, jamais vers la Brique 4 directement** : `{tenant}.transactions` (Brique 1) et `{tenant}.alertes` statut `'ouverte'` (Brique 5), dupliquées en lecture directe sans import runtime — même principe que Brique 5 → Brique 4.
+- **3 requêtes métier** : a) chaînes de redistribution multi-sauts, b) comptes pont entre deux comptes alertés, c) plus court chemin entre comptes alertés (`shortestPath`, remplace la proposition initiale "cluster dense" écartée car nécessitait le plugin GDS non installé et recouvrait la règle `structure_etoile` de la Brique 4).
+- Déclenchement : CLI uniquement (`uv run souverain-grapher`), cohérent avec les briques précédentes.
+
+Exigence de test explicite, respectée : `test_isolation_tenant.py` écrit en premier, avant tout autre test de la brique — scénario délibérément défavorable (deux tenants avec les mêmes `compte_id`), vérifie qu'aucune requête ne fuit d'un tenant à l'autre y compris via traversée multi-sauts, et que la contrainte composite empêche la fusion silencieuse de deux comptes de tenants différents.
+
+Livré :
+- `config.py`/`connexion.py` (driver Neo4j async, singleton, même principe que le pool asyncpg Brique 1), `modeles.py` (`TransactionAImporter`, `Chemin`, `ComptePont`), `lecture.py` (transactions + comptes alertés, double dépendance documentée), `garde_isolation.py` (contraintes, synchronisation par lots de 500, 3 requêtes métier — seul fichier Cypher), `requetes.py` (traduction Record → objets typés), `synchronisation.py` (orchestration), `cli.py` (`uv run souverain-grapher`).
+- `docker-compose.yml` : service `neo4j` ajouté sous le profile réservé depuis la Brique 0, configuration mémoire JVM explicite (heap 512m-1G, page cache 512m).
+- `.env.example` : section Brique 6 activée (URI, user, password, ports).
+- 4 fichiers de test : `test_isolation_tenant.py` (5 tests, écrit en premier), `test_synchronisation.py` (3 tests, idempotence MERGE), `test_requetes.py` (3 tests, couche de présentation + cas `{tenant}.alertes` vide explicitement couvert).
+
+Vérifié en environnement de génération (pas de Neo4j disponible, donc pas d'exécution réelle des tests) :
+- `uv sync --all-packages` — réussi, Brique 6 ajoutée au workspace, driver `neo4j` résolu (v6.2.0).
+- Tous les modules s'importent sans erreur (`python -c "from brique_06_neo4j import ..."`), aucune erreur de syntaxe ni d'import circulaire.
+- `uv run ruff check briques/brique_06_neo4j` — All checks passed (après corrections mineures : f-strings au lieu de `%`, tri des imports).
+- `uv run mypy src` (depuis le dossier de la brique) — Success, no issues found (9 fichiers).
+- Non-régression Briques 0 à 5 : `uv run pytest` sur les 6 briques précédentes — **74 passed, 9 skipped, 9 erreurs** (uniquement `ConnectionRefusedError` PostgreSQL, absence de Docker ici — aucune régression imputable à la Brique 6).
+
+Bug de répartition de code trouvé et corrigé pendant l'implémentation, avant tout run (pas un bug de validation locale — trouvé en écrivant `garde_isolation.py`) :
+- Première version de `garde_isolation.py` faisait la traduction Record Neo4j → objets typés (`Chemin`, `ComptePont`) directement dans ses fonctions, alors que l'analyse avait explicitement acté que ce rôle appartient à `requetes.py`. Corrigé avant tout test écrit : `garde_isolation.py` retourne désormais des `dict` bruts (`Record.data()`), `requetes.py` porte la traduction.
+
+Bug réel détecté et corrigé lors de la validation locale (non détectable en environnement de génération sans Neo4j) :
+- Défaut de mot de passe incohérent entre `config.py` (`password: str = Field(default="")`) et `docker-compose.yml` (`NEO4J_AUTH: ${NEO4J_PASSWORD:-change_me}`). Le conteneur démarre avec `change_me` par défaut, mais le driver Python tentait une chaîne vide si `.env` ne surchargeait pas explicitement la variable — échec d'authentification silencieux (`AuthError`), sans lien avec la disponibilité du conteneur. Aggravé par la ligne `NEO4J_PASSWORD` commentée par défaut dans le `.env` réel du fondateur. Corrigé par l'alignement du défaut `config.py` sur `change_me` (cohérent avec `docker-compose.yml`), et décommentée côté `.env` réel. Un défaut identique des deux côtés est désormais la garantie — plus seulement une bonne pratique de configuration explicite.
+
+Toutes les vérifications confirmées sur la machine réelle du fondateur, contre une vraie instance Neo4j Community + PostgreSQL/TimescaleDB :
+- `uv run pytest briques/brique_06_neo4j/tests/ -v` — **11/11 tests passés** (5 isolation, 3 requêtes, 3 synchronisation), aucun skip.
+- `uv run ruff check briques/brique_06_neo4j` — All checks passed.
+- `uv run mypy src` (depuis le dossier de la brique) — Success, no issues found (9 fichiers).
+- `SHOW CONSTRAINTS` (`cypher-shell`) — **les deux contraintes composites confirmées acceptées en Community Edition** : `compte_tenant_unique` (`UNIQUENESS`, `(tenant_id, compte_id)` sur `:Compte`) et `transaction_tenant_unique` (`RELATIONSHIP_UNIQUENESS`, `(tenant_id, transaction_id)` sur `:ENVOIE`) — point le plus incertain de toute l'analyse, levé.
+- `uv run souverain-grapher --tenant tenant_ne` — **5000 transactions lues et synchronisées**, **88 chaînes de redistribution détectées** (3-6 sauts), 0 compte pont et 0 chemin entre alertés (cohérent avec 0 alerte ouverte sur `tenant_ne`, déjà établi en Brique 5 — pas un défaut).
+- **Confirmation croisée inattendue** : les chaînes détectées suivent systématiquement la structure `cpt_XXX -> pivot_XXX -> cpt_XXX -> cpt_XXX` — le graphe redécouvre par la seule topologie des transactions la structure du pattern `compte_pivot` généré par la Brique 3, sans jamais lire `pattern_label` ni aucune sortie de la Brique 4. Signal fort que la Brique 6 capture une réalité structurelle, pas du bruit.
+- `docker stats` — **931 Mo** réels pour le conteneur Neo4j, sous l'estimation initiale (~1,5-2 Go), confortable sur 14,87 Go disponibles pour Docker.
+- Non-régression Briques 0 à 5 confirmée (aucun test cassé par l'ajout de la Brique 6).
+
+**Brique 6 validée. Prête pour l'analyse de la Brique 7 (Dashboard / investigation) dès demande explicite du fondateur.**
 
 ## Règle
 

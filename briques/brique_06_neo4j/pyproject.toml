@@ -1,0 +1,50 @@
+# ============================================================
+# Brique 6 — Graphe criminel Neo4j
+# ============================================================
+[project]
+name = "brique-06-neo4j"
+version = "0.1.0"
+description = "SOUVERAIN-OS — Brique 6 : projection du flux transactionnel dans un graphe Neo4j, isolation multi-tenant par tenant_id (Neo4j Community Edition — une seule base)"
+requires-python = ">=3.12"
+dependencies = [
+    "brique-01-postgresql",
+    "neo4j>=5.24",
+    "asyncpg>=0.29",
+    "pydantic-settings>=2.4",
+]
+
+[tool.uv.sources]
+brique-01-postgresql = { workspace = true }
+
+[project.scripts]
+souverain-grapher = "brique_06_neo4j.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.12"
+
+[[tool.mypy.overrides]]
+module = "neo4j.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "asyncpg.*"
+ignore_missing_imports = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/brique_06_neo4j"]
+artifacts = ["py.typed"]
