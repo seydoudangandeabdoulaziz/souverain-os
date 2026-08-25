@@ -34,10 +34,35 @@ services:
     networks:
       - souverain-net
 
+  neo4j:
+    image: neo4j:5-community
+    profiles: ["neo4j"]
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-change_me}
+      # Configuration mémoire explicite (jamais les valeurs par défaut
+      # de l'image) — estimée à l'analyse de la Brique 6 : ~1,5-2 Go
+      # au total sur 16 Go disponibles, à confirmer par `docker stats`
+      # au premier démarrage réel.
+      NEO4J_server_memory_heap_initial__size: "512m"
+      NEO4J_server_memory_heap_max__size: "1G"
+      NEO4J_server_memory_pagecache_size: "512m"
+    ports:
+      - "${NEO4J_HTTP_PORT:-7474}:7474"
+      - "${NEO4J_BOLT_PORT:-7687}:7687"
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u ${NEO4J_USER:-neo4j} -p ${NEO4J_PASSWORD:-change_me} 'RETURN 1' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      - souverain-net
+
 # ------------------------------------------------------------
 # Emplacements réservés pour les futurs services, par profile :
 #
-#   profiles: ["neo4j"]      -> Brique 6 (Neo4j)
 #   profiles: ["redis"]      -> Phase transverse (Redis/Celery)
 #   profiles: ["ollama"]     -> Phase transverse (Ollama/Mistral)
 #   profiles: ["monitoring"] -> Phase transverse (Prometheus/Grafana)
@@ -48,6 +73,7 @@ services:
 
 volumes:
   postgres_data:
+  neo4j_data:
 
 networks:
   souverain-net:
