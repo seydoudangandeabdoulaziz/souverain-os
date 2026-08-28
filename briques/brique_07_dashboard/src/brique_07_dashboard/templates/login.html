@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>{{ t('login.titre') }} — {{ t('app.titre') }}</title>
+    <style>
+        body { font-family: system-ui, sans-serif; display: flex; justify-content: center;
+               align-items: center; height: 100vh; margin: 0; background: #f4f4f4; }
+        form { background: white; padding: 2rem; border-radius: 8px; width: 300px;
+               box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
+        label { display: block; margin-top: 1rem; font-size: 0.9rem; }
+        input { width: 100%; padding: 0.5rem; margin-top: 0.25rem; box-sizing: border-box; }
+        button { margin-top: 1.5rem; width: 100%; padding: 0.6rem; background: #0b2545;
+                 color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .erreur { color: #b00020; font-size: 0.9rem; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <form method="post" action="/login">
+        <h1>{{ t('login.titre') }}</h1>
+        {% if erreur %}
+        <p class="erreur">{{ t(erreur) }}</p>
+        {% endif %}
+        <label>{{ t('login.email') }}
+            <input type="email" name="email" required autofocus>
+        </label>
+        <label>{{ t('login.mot_de_passe') }}
+            <input type="password" name="mot_de_passe" required>
+        </label>
+        <button type="submit">{{ t('login.bouton') }}</button>
+    </form>
+</body>
+</html>

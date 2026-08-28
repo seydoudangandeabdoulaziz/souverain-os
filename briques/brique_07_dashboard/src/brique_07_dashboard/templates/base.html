@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="{{ langue|default('fr') }}">
+<head>
+    <meta charset="utf-8">
+    <title>{{ t('app.titre', langue|default('fr')) }}</title>
+    <script src="/static/htmx.min.js"></script>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 0; }
+        nav { background: #0b2545; color: white; padding: 0.75rem 1.5rem;
+              display: flex; justify-content: space-between; align-items: center; }
+        nav a, nav button { color: white; text-decoration: none; background: none;
+                             border: none; font-size: 1rem; cursor: pointer; }
+        main { padding: 1.5rem; max-width: 1000px; margin: 0 auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #ddd; }
+        th { background: #f4f4f4; }
+        .score { font-weight: bold; }
+        .vide { color: #777; font-style: italic; }
+        .chargement { color: #777; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/alertes">{{ t('nav.alertes', langue|default('fr')) }}</a>
+        <form action="/logout" method="post" style="margin:0">
+            <button type="submit">{{ t('nav.deconnexion', langue|default('fr')) }}</button>
+        </form>
+    </nav>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

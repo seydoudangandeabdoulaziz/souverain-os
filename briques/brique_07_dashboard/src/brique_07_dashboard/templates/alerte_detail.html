@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a href="/alertes">&larr; {{ t('alerte_detail.retour', langue) }}</a></p>
+<h1>{{ t('alerte_detail.titre', langue) }} — {{ alerte.compte_pivot }}</h1>
+
+<p>
+    <strong>{{ t('alerte_detail.score', langue) }} :</strong> {{ alerte.score }}<br>
+    <strong>{{ t('alerte_detail.statut', langue) }} :</strong> {{ alerte.statut }}<br>
+    <strong>{{ t('alerte_detail.patterns', langue) }} :</strong>
+        {{ alerte.pattern_types_impliques|join(', ') }}<br>
+    <strong>{{ t('alerte_detail.fenetre', langue) }} :</strong>
+        {{ alerte.fenetre_debut.strftime('%Y-%m-%d') }} &rarr;
+        {{ alerte.fenetre_fin.strftime('%Y-%m-%d') }}
+</p>
+
+<h2>{{ t('alerte_detail.detections_liees', langue) }}</h2>
+{% if alerte.detections_liees %}
+<table>
+    <thead><tr><th>Pattern</th><th>Détecté le</th></tr></thead>
+    <tbody>
+        {% for detection in alerte.detections_liees %}
+        <tr>
+            <td>{{ detection.pattern_type }}</td>
+            <td>{{ detection.detected_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="vide">{{ t('alerte_detail.aucun_resultat_graphe', langue) }}</p>
+{% endif %}
+
+<div id="graphe-resultats"
+     hx-get="/alertes/{{ alerte.alerte_id }}/graphe?compte_pivot={{ alerte.compte_pivot }}"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+    <p class="chargement">{{ t('alerte_detail.chargement_graphe', langue) }}</p>
+</div>
+{% endblock %}

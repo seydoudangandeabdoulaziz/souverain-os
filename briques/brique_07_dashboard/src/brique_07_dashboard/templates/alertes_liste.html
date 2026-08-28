@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ t('alertes.titre', langue) }}</h1>
+
+{% if alertes %}
+<table>
+    <thead>
+        <tr>
+            <th>{{ t('alertes.colonne_compte', langue) }}</th>
+            <th>{{ t('alertes.colonne_score', langue) }}</th>
+            <th>{{ t('alertes.colonne_statut', langue) }}</th>
+            <th>{{ t('alertes.colonne_patterns', langue) }}</th>
+            <th>{{ t('alertes.colonne_maj', langue) }}</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for alerte in alertes %}
+        <tr>
+            <td><a href="/alertes/{{ alerte.alerte_id }}">{{ alerte.compte_pivot }}</a></td>
+            <td class="score">{{ alerte.score }}</td>
+            <td>{{ alerte.statut }}</td>
+            <td>{{ alerte.pattern_types_impliques|join(', ') }}</td>
+            <td>{{ alerte.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="vide">{{ t('alertes.aucune', langue) }}</p>
+{% endif %}
+{% endblock %}
