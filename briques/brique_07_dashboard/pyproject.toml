@@ -1,0 +1,78 @@
+# ============================================================
+# Brique 7 — Dashboard / investigation
+# ============================================================
+# Deux dépendances RUNTIME (pas dev-group), exceptions documentées à
+# la convention "dupliquer plutôt que dépendre" des briques précédentes :
+# - brique-02-auth-rbac : l'authentification ne doit jamais avoir deux
+#   sources de vérité.
+# - brique-06-neo4j : requetes.py est appelé réellement en production
+#   pour l'écran de détail, pas seulement en test.
+# ============================================================
+[project]
+name = "brique-07-dashboard"
+version = "0.1.0"
+description = "SOUVERAIN-OS — Brique 7 : dashboard d'investigation (FastAPI + HTMX), lecture seule"
+requires-python = ">=3.12"
+dependencies = [
+    "brique-01-postgresql",
+    "brique-02-auth-rbac",
+    "brique-06-neo4j",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "jinja2>=3.1.0",
+    "python-multipart>=0.0.9",
+    "pydantic-settings>=2.5.0",
+]
+
+[tool.uv.sources]
+brique-01-postgresql = { workspace = true }
+brique-02-auth-rbac = { workspace = true }
+brique-06-neo4j = { workspace = true }
+# Dépendances de TEST uniquement (génération de données réalistes pour
+# les fixtures — mêmes fonctions enregistrer_detections()/
+# enregistrer_scores() déjà validées) : jamais importées en runtime,
+# même principe que Brique 5 → Brique 4.
+brique-04-detection = { workspace = true }
+brique-05-scoring-alertes = { workspace = true }
+
+[project.scripts]
+souverain-dashboard = "brique_07_dashboard.cli:main"
+
+[dependency-groups]
+dev = [
+    "brique-04-detection",
+    "brique-05-scoring-alertes",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.12"
+
+[[tool.mypy.overrides]]
+module = "asyncpg.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# La Brique 2 n'a pas de py.typed (contrairement à toutes les autres
+# briques) — jamais nécessaire jusqu'ici, personne n'en dépendait pour
+# son typage. Contournement local, sans toucher à la Brique 2 déjà
+# validée. Signalé au fondateur : la vraie correction (py.typed +
+# artifacts dans le pyproject.toml de la Brique 2, même traitement que
+# la Brique 1) reste à faire, par décision explicite, pas ici.
+module = "brique_02_auth_rbac.*"
+ignore_missing_imports = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/brique_07_dashboard"]
+artifacts = ["py.typed", "templates/*", "static/*"]

@@ -1,0 +1,35 @@
+{# Fragment HTMX — pas de {% extends %}, injecté tel quel dans #graphe-resultats #}
+
+<h2>{{ t('alerte_detail.chaines_redistribution', langue) }}</h2>
+{% if chaines %}
+<ul>
+    {% for chemin in chaines %}
+    <li>{{ chemin.comptes|join(' &rarr; ')|safe }} ({{ chemin.nb_sauts }} saut(s))</li>
+    {% endfor %}
+</ul>
+{% else %}
+<p class="vide">{{ t('alerte_detail.aucun_resultat_graphe', langue) }}</p>
+{% endif %}
+
+<h2>{{ t('alerte_detail.comptes_pont', langue) }}</h2>
+{% if ponts %}
+<ul>
+    {% for pont in ponts %}
+    <li>{{ pont.compte_alerte_source }} &rarr; <strong>{{ pont.compte_pont }}</strong> &rarr;
+        {{ pont.compte_alerte_cible }}</li>
+    {% endfor %}
+</ul>
+{% else %}
+<p class="vide">{{ t('alerte_detail.aucun_resultat_graphe', langue) }}</p>
+{% endif %}
+
+<h2>{{ t('alerte_detail.chemins_alertes', langue) }}</h2>
+{% if chemins %}
+<ul>
+    {% for chemin in chemins %}
+    <li>{{ chemin.comptes|join(' &rarr; ')|safe }} ({{ chemin.nb_sauts }} saut(s))</li>
+    {% endfor %}
+</ul>
+{% else %}
+<p class="vide">{{ t('alerte_detail.aucun_resultat_graphe', langue) }}</p>
+{% endif %}

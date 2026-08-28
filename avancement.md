@@ -25,7 +25,7 @@ VALIDÉE
 | 4 | Détection Hybrid-Stream | **VALIDÉE** |
 | 5 | Scoring + alertes | **VALIDÉE** |
 | 6 | Neo4j | **VALIDÉE** |
-| 7 | Dashboard / investigation | NON COMMENCÉE |
+| 7 | Dashboard / investigation | **VALIDÉE** |
 | 8 | Audit + Human-in-the-loop | NON COMMENCÉE |
 
 ## Phase transverse (après le flux principal)
@@ -149,7 +149,7 @@ Décisions d'architecture actées (analyse validée avant implémentation) :
 - Tenant MVP : un seul (`tenant_ne`, Niger), `tenant_id` générique dans `inserer_transactions()` pour extension future.
 
 Dépendance réelle découverte et traitée pendant l'implémentation :
-- `{tenant}.transactions.tenant_id/country_code/data_classification` sont des colonnes `NOT NULL` référençant `shared.tenants_registry`, qui n'a aucun mécanisme d'enregistrement avant la Brique 8 (`create_tenant()` complet). Ajout d'un bootstrap MVP minimal et explicitement provisoire (`scripts/bootstrap_tenant_ne.sql`), à remplacer par la vraie gouvernance en Brique 8.
+- `{tenant}.transactions.tenant_id/country_code/data_classification` sont des colonnes `NOT NULL` référençant `shared.tenants_registry`, qui n'a aucun mécanisme d'enregistrement automatisé. Ajout d'un bootstrap MVP minimal et explicitement provisoire (`scripts/bootstrap_tenant_ne.sql`), à remplacer par une vraie gouvernance multi-tenant (`create_tenant()`) — **correction du 28 août 2026** : cette référence pointait initialement vers "la Brique 8", mais le périmètre de la Brique 8 a depuis été confirmé strictement limité à Audit + Human-in-the-loop (`00_DECISIONS_VERROUILLEES.md`). `create_tenant()` reste un besoin réel non positionné dans l'ordre numéroté, au même titre que les notifications citoyens — voir le point en suspens ajouté à `06_ROADMAP_ET_BRIQUES.md`.
 
 Livré :
 - `generateur_legitime.py` (transactions Mobile Money légitimes, distribution log-normale des montants), `patterns_suspects.py` (6 patterns du Bloc 7 : nocturne, structure en étoile, micro-fractionnement, saisonnalité, flux frontalier, compte pivot), `ingestion.py` (insertion par lots de 500, réutilise `create_pool()`/`validate_schema_name()` de la Brique 1), `cli.py` (`uv run souverain-generer`), `config.py`.
@@ -327,6 +327,55 @@ Toutes les vérifications confirmées sur la machine réelle du fondateur, contr
 - Non-régression Briques 0 à 5 confirmée (aucun test cassé par l'ajout de la Brique 6).
 
 **Brique 6 validée. Prête pour l'analyse de la Brique 7 (Dashboard / investigation) dès demande explicite du fondateur.**
+
+## Détail — Brique 7 (Dashboard / investigation)
+
+**Statut : VALIDÉE**
+
+**Date de validation : 28 août 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+Décisions d'architecture actées (analyse validée avant implémentation) :
+- **Périmètre strictement lecture seule** : aucun déclenchement de calcul, aucun changement d'état d'alerte (`'ouverte' → 'fermee'` appartient entièrement à la Brique 8, non commencée).
+- **Authentification — Option A** : `auth_cookie.py` lit le JWT depuis un cookie `httpOnly`, réutilise les primitives de la Brique 2 (`decode_token`, `get_user_by_id`) sans jamais modifier `session.py` (déjà validé) ni son wrapper `HTTPBearer`, inadapté à un dashboard HTMX.
+- **Revalidation défensive du tenant** : `tenant_valide()` revérifie `tenant_id` du JWT contre `shared.tenants_registry.is_active` à chaque requête — un JWT signé ne prouve pas que le tenant est toujours actif maintenant. Testé explicitement (tenant désactivé après émission du jeton → rejeté).
+- **Requêtes graphe exclusivement via `garde_isolation.py`** (Brique 6) — aucun Cypher dans cette brique, extension de la règle du point de passage unique.
+- **Multilinguisme posé dès cette brique** (ADR-001, pas un ajout futur) : `t(cle, langue)` en global Jinja2, aucun texte français en dur, seul `fr.py` livré.
+- **Rapports signés retirés du périmètre MVP** : la PQC (Dilithium-5) n'existe pas encore — aucun export, signé ou non, avant son existence. Évite de reconstruire deux fois la même fonctionnalité.
+- **HTMX vendorisé localement** (récupéré via npm, domaine autorisé) — jamais de CDN étranger, conforme au Bloc 5.
+- **Filtrage des résultats du graphe — Option A** : les 3 fonctions de la Brique 6 retournent les résultats pour tout le tenant, filtrage côté Python dans `routes/alertes.py`, aucune modification de la Brique 6 déjà figée.
+
+Point de vigilance documenté explicitement (pas une correction — une limite assumée, différente des précédentes) :
+- Contrairement aux limites d'échelle déjà acceptées en Brique 4/5/6 (traitements batch CLI, latence indifférente), le filtrage Option A du fragment graphe touche directement le temps de réponse d'une page web consultée par un humain qui attend. Atténué par la scission de la page de détail (chargement immédiat) et du fragment graphe (chargé après coup via HTMX, `hx-trigger="load"`, avec état de chargement visible). Pas un problème au volume actuel — à surveiller si le volume grossit, avant de passer à l'Option B (non implémentée).
+
+Manque découvert, non corrigé silencieusement pendant l'implémentation :
+- La Brique 2 est la seule brique du projet sans `py.typed` — jamais nécessaire jusqu'ici, personne n'en dépendait pour son typage. La Brique 7 est la première. Corriger proprement demande de toucher deux points de la Brique 2 déjà validée (fichier `py.typed` + son enregistrement dans `artifacts` de `pyproject.toml`, même traitement que la Brique 1). Non fait : contournement local autonome dans `pyproject.toml` de la Brique 7 (`ignore_missing_imports` ciblé), en attendant une décision explicite du fondateur.
+
+Bug réel trouvé et corrigé pendant l'écriture des tests, avant tout run (pas un bug de validation locale) :
+- La fixture `alerte_test` (conftest.py) confondait initialement `detection_ids` (à passer à `ScoreCompte`) avec les `transaction_id` des événements sources — deux identifiants différents. Corrigé par une relecture explicite de `{tenant}.detections` après insertion, pour récupérer les vrais `detection_id` générés côté persistence.
+
+Bug réel détecté et corrigé lors de la validation locale (non détectable en environnement de génération sans PostgreSQL) :
+- 3 tests échouaient (`test_lire_alerte_inexistante_retourne_none`, `test_liste_alertes_vide_affiche_le_message_dedie`, `test_detail_alerte_inexistante_retourne_404`) — cause commune : aucun n'utilisait la fixture `alerte_test`, donc `{tenant}.alertes` n'existait pas du tout pour ce tenant éphémère (la table est créée par `enregistrer_scores()` côté Brique 5, jamais par la Brique 7, strictement lecture). `asyncpg.exceptions.UndefinedTableError: relation "tenant_test_dashboard.alertes" does not exist` remontait brute jusqu'à l'utilisateur — inacceptable pour une page web consultée par un humain (contrairement à la Brique 6, où la même situation fait volontairement remonter l'erreur brute, public développeur d'un batch CLI). Corrigé par une nouvelle exception dédiée `TenantSansDonnees` (`lecture.py`), interceptée globalement dans `app.py` et présentée comme une page propre ("aucun cycle de scoring encore exécuté pour ce tenant"), tout en restant tracée (logs) — Option B validée après diagnostic. Les 3 tests corrigés distinguent maintenant explicitement ce cas ("table absente") du cas qu'ils prétendaient tester à l'origine ("table présente, ligne absente") via une nouvelle fixture dédiée `alertes_table_creee_sans_alerte`, et 2 tests supplémentaires couvrent le cas `TenantSansDonnees` lui-même, à la fois côté `lecture.py` et côté HTTP.
+- Risque connexe identifié **et corrigé** : `brique_06_neo4j.lecture.lire_comptes_alertes()` (appelée par le fragment graphe de cette brique) lit elle aussi `{tenant}.alertes` et laisse délibérément la même exception remonter brute (philosophie assumée côté Brique 6, public développeur d'un batch CLI). Un accès direct/manuel à `/alertes/{id}/graphe` sur un tenant sans table (URL en favori, sans passer par la page de détail au préalable) exposait le même risque de 500 brut. Corrigé dans `routes/alertes.py` uniquement (`try/except UndefinedTableError` → liste vide) — fonctionnellement équivalent à "0 compte alerté" pour cette requête précise, comportement déjà validé par les tests existants de la Brique 6. **Aucune modification de la Brique 6.**
+- Bug de fuite de driver Neo4j entre tests, révélé par l'ajout du test du point précédent (pas introduit par lui — préexistant, simplement jamais déclenché tant qu'un seul test du fichier touchait Neo4j via `client`) : `create_driver()` (Brique 6) est un singleton, mais chaque test pytest-asyncio tourne dans sa propre boucle asyncio (scope function). La fixture `driver` fermait bien le driver en fin de test ; la fixture `client` (Brique 7), elle, ne le faisait jamais — un driver créé dans la boucle d'un test fuyait vers le test suivant, lié à une boucle déjà détruite, provoquant un échec de `session.run()` sans rapport avec la logique métier testée. Corrigé par l'ajout de `close_driver()` en teardown de la fixture `client` (`tests/conftest.py`), même précaution que la fixture `driver`.
+
+Livré :
+- `config.py`, `auth_cookie.py` (adaptateur cookie, primitives Brique 2 réutilisées), `tenant_garde.py` (revalidation défensive), `traductions/` (`t()`, `fr.py`), `lecture.py` (alertes/détections, lecture seule, `TenantSansDonnees`), `modeles.py` (objets d'affichage), `routes/auth.py` (login/logout), `routes/alertes.py` (liste, détail, fragment graphe, protection contre le risque connexe), `app.py` (construction FastAPI, gestion `SessionInvalide` + `TenantSansDonnees`), `cli.py` (`uv run souverain-dashboard`), templates Jinja2 + HTMX (dont `tenant_sans_donnees.html`), `static/htmx.min.js` vendorisé.
+- 20 tests : `test_tenant_garde.py` (3), `test_auth_cookie.py` (3), `test_lecture.py` (5), `test_routes_alertes.py` (9, dont le test du risque connexe), HTTP de bout en bout via `httpx.AsyncClient` + `ASGITransport`, jamais `TestClient`.
+
+Vérifié sur la machine réelle du fondateur, contre une vraie instance PostgreSQL + Neo4j :
+- `uv run pytest` sur les 8 briques (0 à 7) combinées — **123/123 tests passés**, aucun échec, aucune erreur (20 tests propres à la Brique 7 : 3 `test_tenant_garde.py` + 3 `test_auth_cookie.py` + 5 `test_lecture.py` + 9 `test_routes_alertes.py`).
+- `uv run ruff check briques/brique_07_dashboard` — All checks passed.
+- `uv run mypy src` (depuis le dossier de la brique) — Success, no issues found (13 fichiers).
+- Utilisateur réel créé via script ponctuel (`creer_utilisateur_dashboard.py`, hors périmètre de la brique, cf. décision ci-dessous), connexion réussie dans un vrai navigateur (`http://localhost:8080`) : redirection `/login` → cookie `httpOnly` posé → `/alertes` → déconnexion fonctionnelle.
+- Alerte réelle créée via un second script ponctuel (`creer_alerte_demo.py`, même principe — réutilise `enregistrer_detections`/`enregistrer_scores` déjà validées, aucune modification des Briques 4/5) : liste → détail → **fragment graphe vérifié en conditions réelles**, chargé après la page (comportement de scission voulu, observé), 3 sections rendues correctement, "Aucun résultat" correctement affiché (le compte de démo n'ayant jamais été synchronisé dans Neo4j — comportement attendu, pas un bug).
+
+Deux bugs réels trouvés et corrigés lors de la validation locale (non détectables en environnement de génération sans PostgreSQL/Neo4j) :
+- **Risque connexe sur le fragment graphe** : `brique_06_neo4j.lecture.lire_comptes_alertes()` laissait `UndefinedTableError` remonter brute si `{tenant}.alertes` n'existe pas — un accès direct à `/alertes/{id}/graphe` (URL en favori, sans passer par la page de détail) sur un tenant neuf exposait un 500 brut. Corrigé dans `routes/alertes.py` uniquement (`try/except` → liste vide), aucune modification de la Brique 6.
+- **Fuite de driver Neo4j entre tests** : la fixture `client` (tests) ne fermait jamais le driver singleton de la Brique 6 — un driver créé dans la boucle asyncio d'un test fuyait vers le test suivant (boucle différente), provoquant un échec de `session.run()` sans rapport avec la logique testée. Révélé par l'ajout du test du point précédent, pas causé par lui. Corrigé par `close_driver()` en teardown de la fixture `client`, même précaution que la fixture `driver`.
+
+Décision actée après validation : la création d'utilisateur via interface (route API dédiée dans la Brique 2) est **reportée explicitement**, pas oubliée — traitée pour l'instant par un script ponctuel hors périmètre des briques (`creer_utilisateur_dashboard.py`, non committé). Aucune modification de la Brique 2 pour cela, conformément à la décision du fondateur.
+
+**Brique 7 validée. Prête pour l'analyse de la Brique 8 (Audit + Human-in-the-loop) dès demande explicite du fondateur.**
 
 ## Règle
 
