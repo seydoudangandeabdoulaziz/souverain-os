@@ -1,0 +1,46 @@
+{# Fragment HTMX — pas de {% extends %}, injecté tel quel dans
+   #fermeture-resultats (voir l'ajout minimal dans alerte_detail.html
+   de la Brique 7). Même convention que graphe_fragment.html. #}
+
+<h2>{{ t('fermeture.historique_titre') }}</h2>
+{% if historique %}
+<ul class="audit-historique">
+    {% for entree in historique %}
+    <li>
+        <strong>{{ entree.motif }}</strong>
+        {{ t('fermeture.par') }} {{ entree.email_utilisateur or entree.user_id }}
+        &mdash; {{ entree.created_at.strftime('%Y-%m-%d %H:%M') }}
+        {% if entree.commentaire %}
+        <p class="audit-commentaire">{{ entree.commentaire }}</p>
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p class="vide">{{ t('fermeture.historique_vide') }}</p>
+{% endif %}
+
+{% if vient_de_fermer %}
+<p class="succes">{{ t('fermeture.confirmee') }}</p>
+{% elif peut_fermer %}
+<h2>{{ t('fermeture.titre') }}</h2>
+<form
+    hx-post="/alertes/{{ alerte_id }}/fermeture"
+    hx-target="#fermeture-resultats"
+    hx-swap="innerHTML"
+>
+    <input type="hidden" name="jeton_csrf" value="{{ jeton_csrf }}">
+
+    <label for="motif">{{ t('fermeture.motif') }}</label>
+    <select name="motif" id="motif" required>
+        {% for motif in motifs %}
+        <option value="{{ motif.value }}">{{ t('fermeture.motif_' + motif.value) }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="commentaire">{{ t('fermeture.commentaire') }}</label>
+    <textarea name="commentaire" id="commentaire" rows="3"></textarea>
+
+    <button type="submit">{{ t('fermeture.bouton') }}</button>
+</form>
+{% endif %}

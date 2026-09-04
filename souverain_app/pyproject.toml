@@ -1,0 +1,48 @@
+# ============================================================
+# souverain_app — module d'assemblage neutre (Brique 7 + Brique 8)
+# ============================================================
+# Introduit à l'analyse de la Brique 8, validé explicitement par le
+# fondateur. Contient uniquement du câblage FastAPI (include_router),
+# aucune logique métier. Pas dans briques/ : ce n'est pas une brique
+# fonctionnelle du document fondateur, c'est un point d'assemblage
+# transverse, comme shared/ mais côté composition plutôt que domaine.
+# ============================================================
+[project]
+name = "souverain-app"
+version = "0.1.0"
+description = "SOUVERAIN-OS — assemblage FastAPI Brique 7 (dashboard) + Brique 8 (audit/fermeture)"
+requires-python = ">=3.12"
+dependencies = [
+    "brique-07-dashboard",
+    "brique-08-audit-human-loop",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+]
+
+[tool.uv.sources]
+brique-07-dashboard = { workspace = true }
+brique-08-audit-human-loop = { workspace = true }
+
+[project.scripts]
+souverain-app = "souverain_app.cli:main"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[tool.mypy]
+python_version = "3.12"
+
+[[tool.mypy.overrides]]
+module = "brique_02_auth_rbac.*"
+ignore_missing_imports = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/souverain_app"]
+artifacts = ["py.typed"]

@@ -1,0 +1,69 @@
+# ============================================================
+# Brique 8 — Audit trail + Human-in-the-loop
+# ============================================================
+# Dépendances RUNTIME (pas dev-group), exceptions documentées à la
+# convention "dupliquer plutôt que dépendre" des briques précédentes :
+# - brique-01-postgresql : create_pool() admin, réservé à l'auto-
+#   réparation DDL de audit_log (voir persistence.py).
+# - brique-02-auth-rbac : l'authentification/le RBAC ne doivent jamais
+#   avoir deux sources de vérité (require_role() étendu à l'analyse de
+#   cette brique — voir 00_DECISIONS_VERROUILLEES.md / avancement.md).
+# - brique-07-dashboard : get_current_user_from_cookie et tenant_valide
+#   sont réutilisés TELS QUELS (jamais dupliqués une troisième fois) —
+#   Brique 8 vit dans le même dashboard cookie-based, pas dans une API
+#   Bearer séparée.
+# ============================================================
+[project]
+name = "brique-08-audit-human-loop"
+version = "0.1.0"
+description = "SOUVERAIN-OS — Brique 8 : audit trail immuable + fermeture d'alerte humaine (RBAC)"
+requires-python = ">=3.12"
+dependencies = [
+    "brique-01-postgresql",
+    "brique-02-auth-rbac",
+    "brique-07-dashboard",
+    "asyncpg>=0.29.0",
+    "fastapi>=0.115.0",
+    "jinja2>=3.1.0",
+    "python-multipart>=0.0.9",
+    "pydantic-settings>=2.5.0",
+]
+
+[tool.uv.sources]
+brique-01-postgresql = { workspace = true }
+brique-02-auth-rbac = { workspace = true }
+brique-07-dashboard = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.12"
+
+[[tool.mypy.overrides]]
+module = "asyncpg.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Même contournement documenté que Brique 7 : la Brique 2 n'a toujours
+# pas de py.typed. Non corrigé ici non plus — décision explicite du
+# fondateur en attente, signalée à nouveau, pas re-décidée localement.
+module = "brique_02_auth_rbac.*"
+ignore_missing_imports = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/brique_08_audit_human_loop"]
+artifacts = ["py.typed", "templates/*"]

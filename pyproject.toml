@@ -38,6 +38,8 @@ members = [
     "briques/brique_05_scoring_alertes",
     "briques/brique_06_neo4j",
     "briques/brique_07_dashboard",
+    "briques/brique_08_audit_human_loop",
+    "souverain_app",
 ]
 
 [tool.ruff]

@@ -36,4 +36,16 @@
      hx-swap="innerHTML">
     <p class="chargement">{{ t('alerte_detail.chargement_graphe', langue) }}</p>
 </div>
+
+{# Point d'intégration Brique 8 (Audit + Human-in-the-loop), ajout
+   minimal validé à l'analyse — seule ligne touchée dans ce fichier
+   Brique 7 déjà validé. Le fragment (formulaire de fermeture +
+   historique d'audit) porte son propre texte via son propre
+   mécanisme t() ; aucune clé de traduction Brique 7 n'est requise ici. #}
+<div id="fermeture-resultats"
+     hx-get="/alertes/{{ alerte.alerte_id }}/fermeture"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+    <p class="chargement">…</p>
+</div>
 {% endblock %}

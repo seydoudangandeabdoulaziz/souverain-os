@@ -26,7 +26,7 @@ VALIDÉE
 | 5 | Scoring + alertes | **VALIDÉE** |
 | 6 | Neo4j | **VALIDÉE** |
 | 7 | Dashboard / investigation | **VALIDÉE** |
-| 8 | Audit + Human-in-the-loop | NON COMMENCÉE |
+| 8 | Audit + Human-in-the-loop | **VALIDÉE** |
 
 ## Phase transverse (après le flux principal)
 
@@ -376,6 +376,64 @@ Deux bugs réels trouvés et corrigés lors de la validation locale (non détect
 Décision actée après validation : la création d'utilisateur via interface (route API dédiée dans la Brique 2) est **reportée explicitement**, pas oubliée — traitée pour l'instant par un script ponctuel hors périmètre des briques (`creer_utilisateur_dashboard.py`, non committé). Aucune modification de la Brique 2 pour cela, conformément à la décision du fondateur.
 
 **Brique 7 validée. Prête pour l'analyse de la Brique 8 (Audit + Human-in-the-loop) dès demande explicite du fondateur.**
+
+## Détail — Brique 8 (Audit trail + Human-in-the-loop)
+
+**Statut : EN VALIDATION — implémentée, 138/138 tests passés sur la machine réelle du fondateur (ThinkPad X1 Carbon Gen 6, PostgreSQL + Neo4j réels), zéro régression sur les Briques 0 à 7. Reste la vérification manuelle dans un vrai navigateur avant validation explicite.**
+
+Décisions d'architecture actées (analyse validée avant implémentation, en plusieurs passes) :
+- Actions humaines couvertes : fermeture d'alerte avec motif structuré (liste fermée : `faux_positif`, `confirme`, `en_cours_investigation`) + commentaire optionnel. Pas de réouverture, pas de modification du score, pas d'assignation.
+- RBAC : `analyst` et `admin` peuvent fermer une alerte ; `auditor` voit l'historique seul (formulaire masqué côté affichage, refus `403` côté exécution même en cas de requête forgée).
+- Interface : extension du dashboard Brique 7 via un nouveau module d'assemblage racine (`souverain_app/`), pas une modification interne de la Brique 7 — zéro fichier Brique 7 modifié en logique, un seul ajout additif (une div HTMX) dans `alerte_detail.html`.
+- Immuabilité de `audit_log` : défense en profondeur actée explicitement — rôle PostgreSQL dédié (`souverain_brique8_audit`, privilèges `INSERT`/`SELECT` uniquement sur `audit_log`, jamais `UPDATE`/`DELETE`) **et** discipline applicative (aucune route de modification/suppression). Ce rôle a aussi `SELECT`/`UPDATE` sur `{tenant}.alertes`, nécessaire pour que la fermeture d'alerte et l'écriture d'audit restent atomiques (une seule transaction, un seul rôle) — l'absence d'`UPDATE`/`DELETE` spécifiquement sur `audit_log` constitue la garantie recherchée.
+- Retouche de `require_role()` (Brique 2, déjà validée) : ajout d'un paramètre `user_dependency`, défaut inchangé (`get_current_user`) — rétrocompatible, nécessaire car `require_role()` était câblé en dur sur l'authentification par header `Bearer`, inutilisable pour une route cookie-based comme celle du dashboard.
+
+Bug réel trouvé et corrigé pendant l'implémentation, avant tout test écrit (pas une correction de validation locale) :
+- Le routeur de cette brique (`router = APIRouter()`) était initialement déclaré au niveau module, comme dans `brique_07_dashboard/routes/alertes.py` et `routes/auth.py` — motif reproduit sans intention. Ce pattern accumule les routes à chaque appel de `construire_routes_audit()` dans le même process Python (chaque test reconstruisant l'app ré-enregistrerait les mêmes routes sur le même routeur partagé). Corrigé pour cette brique en déplaçant la construction du routeur à l'intérieur de la fonction, vérifié par deux appels successifs de `creer_application_complete()` ne produisant plus aucun doublon. **Le même motif existe toujours dans la Brique 7 (`routes/alertes.py`, `routes/auth.py`) — signalé ici pour information, fichiers déjà validés, non corrigés.**
+
+Incohérence documentaire relevée, signalée, non corrigée silencieusement :
+- `brique_01_postgresql/tenant_provisioning.py` contient un commentaire affirmant que `create_tenant()` « appartient à la Brique 8 », antérieur à la correction du 28 août 2026 qui a explicitement retiré `create_tenant()` du périmètre de cette brique (voir `06_ROADMAP_ET_BRIQUES.md`). Le commentaire n'a jamais été mis à jour en conséquence. Aucune ligne de ce fichier n'a été modifiée par la Brique 8 — reste à corriger par décision explicite du fondateur.
+
+Livré :
+- `config.py`, `connection.py` (pool PostgreSQL dédié, rôle restreint, distinct du pool admin de la Brique 1), `modeles.py` (`MotifFermeture`, `EntreeAudit`, `AlerteNonFermable`), `persistence.py` (fermeture + audit dans une seule transaction, auto-réparation de la table via le pool admin), `lecture.py` (historique d'audit, jointure `shared.users`), `csrf.py` (double-submit cookie), `routes.py` (2 routes, instance `Jinja2Templates` propre à la brique), `traductions/` (mécanisme `t()` isolé de celui de la Brique 7, ADR-001), `templates/fermeture_fragment.html`.
+- `migrations/0001_create_audit_log_table.sql` (rôle dédié + table + grants, par tenant déjà enregistré).
+- `souverain_app/` — nouveau module racine d'assemblage FastAPI (Brique 7 + Brique 8), point d'entrée `uv run souverain-app`.
+- Ajout d'une variable `user_dependency` à `require_role()` (Brique 2).
+- Ajout d'une div HTMX dans `alerte_detail.html` (Brique 7) — seule modification de ce fichier.
+- 15 tests : `test_csrf.py` (4, sans DB), `test_persistence.py` (5, intégration — dont le test du privilège PostgreSQL réel), `test_routes.py` (6, HTTP de bout en bout via `httpx.AsyncClient` + `ASGITransport`).
+
+Vérifié en environnement de génération (dépôt réel cloné, pas de suppositions sur le code existant) :
+- `uv sync --all-packages` — installation réussie, Brique 8 et `souverain_app` ajoutés au workspace.
+- Import de tous les modules + assemblage complet de l'application (`souverain_app.main.creer_application_complete()`) — sans erreur, 7 routes confirmées dans le schéma OpenAPI dont `GET`/`POST /alertes/{id}/fermeture`.
+- `uv run ruff check briques/brique_08_audit_human_loop souverain_app` — All checks passed (après `--fix` sur un `SIM117`, et ajout de `# noqa: B008` sur les paramètres `Form`/`Depends`, motif déjà présent dans la Brique 7).
+- `uv run mypy src` (Brique 8, `souverain_app`) — Success, no issues found.
+- Non-régression **stricte** de `test_rbac.py` (Brique 2) après la retouche de `require_role()` : **3/3 passés**, fichier de test inchangé.
+- Non-régression mypy de la Brique 7 après l'ajout de la div HTMX : Success, no issues found (13 fichiers).
+- `uv run pytest tests/test_csrf.py` (Brique 8) — **4/4 passés**.
+- `uv run pytest` sur l'ensemble du workspace (Briques 0 à 8) — **81 passed, 9 skipped, 48 errors** ; toutes les erreurs sont des `ConnectionRefusedError` sur `localhost:5432` (pas de conteneur Docker dans cet environnement), même limite déjà documentée pour chaque brique précédente depuis la Brique 1 — rien d'imputable à la Brique 8.
+
+Vérifié sur la machine réelle du fondateur (ThinkPad X1 Carbon Gen 6), contre une vraie instance PostgreSQL/TimescaleDB et Neo4j — trois allers-retours de correction en conditions réelles, chacun documenté ci-dessous car aucun n'était détectable en environnement de génération :
+
+1. **Migration** : le rôle `souverain_brique8_audit` et la table étaient déjà présents (relance idempotente confirmée, `NOTICE: relation already exists, skipping`).
+2. **Bug réel #1** (`conftest.py`) : la fixture `tenant_provisionne` tentait `GRANT ... ON alertes` avant que cette table existe (créée paresseusement par `enregistrer_scores()` de la Brique 5, pas par le provisioning) — l'erreur survenait avant le `try/yield/finally` de la fixture, laissant un tenant de test orphelin dans `shared.tenants_registry`. Corrigé : le GRANT déplacé après la création réelle de la table.
+2bis. **Bug réel #2** (`persistence.py`) : `fermer_alerte_avec_audit()` traitait toute `UndefinedTableError` comme "audit_log manquante, à réparer" — alors qu'une alerte sur un tenant où `alertes` elle-même n'existe pas (Brique 5 jamais exécutée) est un cas différent (alerte introuvable, rien à réparer). Corrigé via `to_regclass()` pour distinguer les deux causes.
+3. **Bug réel #3** (`csrf.py`/`routes.py`) : injecter un `Response` via `Depends` et poser un cookie dessus ne fonctionne pas quand la route retourne un `TemplateResponse` — FastAPI ne fusionne les headers/cookies d'un Response injecté que si la route retourne autre chose qu'un Response. Corrigé en posant le cookie directement sur l'objet réellement retourné.
+4. **Bug réel #4** (`connection.py`) : cache de requêtes préparées côté serveur invalidé par le cycle `DROP SCHEMA CASCADE` / recréation des tests d'intégration (nouveaux OID pour des tables de même nom) — `InvalidCachedStatementError` au lieu de `UndefinedTableError`, donc jamais intercepté. Corrigé via `statement_cache_size=0` sur le pool dédié.
+5. **Bug réel #5** (`test_routes.py`) : le pool dédié de la Brique 8, singleton créé par la route elle-même, n'était fermé par aucune fixture des tests HTTP — fuite entre tests avec boucles asyncio différentes (`Event loop is closed`), même classe de bug déjà rencontrée et corrigée pour le driver Neo4j en Brique 7. Corrigé par `close_audit_pool()` en teardown de `_client_pour()`.
+
+Après ces cinq corrections :
+- `uv run pytest` sur l'ensemble du workspace (Briques 0 à 8), PostgreSQL et Neo4j réels démarrés — **138/138 tests passés, 0 échec**.
+- Détail Brique 8 : `test_csrf.py` 4/4, `test_persistence.py` 5/5 (dont `test_role_restreint_ne_peut_pas_modifier_l_audit_log`, confirmant concrètement le privilège PostgreSQL réel), `test_routes.py` 6/6.
+- Non-régression confirmée sur les Briques 0 à 7 (aucun test cassé par l'ajout de la Brique 8).
+
+**Vérification manuelle dans un vrai navigateur, effectuée par le fondateur :**
+- Fermeture réelle de l'alerte `demo_dashboard_test_01` (motif `faux_positif`, commentaire libre) — historique affiché correctement avec l'email résolu (`azo@gmail.com`, jointure `shared.users`), horodatage et message de confirmation via le mécanisme `t()` propre à la Brique 8.
+- Les 3 requêtes Neo4j du fragment graphe (Brique 6) ont correctement retourné "Aucun résultat" pour ce compte de démo, jamais synchronisé dans Neo4j — comportement déjà documenté et attendu depuis la Brique 7, confirmé non cassé par l'ajout de la Brique 8.
+- Rôle `auditor` (formulaire masqué, historique seul) : **non vérifié visuellement** dans le navigateur (aucun compte `auditor` créé sur l'environnement de démo du fondateur) — confirmé uniquement par `test_fragment_masque_le_formulaire_pour_un_auditor`, qui crée un vrai utilisateur `auditor` et vérifie l'absence du `<form>` dans une vraie réponse HTTP contre la base réelle. Le fondateur juge cette couverture automatisée suffisante, la vérification visuelle n'étant qu'un bonus de confiance et non une condition de validation.
+
+**Brique 8 (Audit trail + Human-in-the-loop) VALIDÉE le 4 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+**Prête pour l'analyse de la phase transverse (RAG/Ollama, PQC, Redis/Celery, Prometheus/Grafana, SOUVERAIN-ID complet) dès demande explicite du fondateur.** Deux besoins réels restent non positionnés dans l'ordre numéroté (`create_tenant()`, notifications citoyens — voir `06_ROADMAP_ET_BRIQUES.md`) et une décision reste en attente (le marqueur `py.typed` manquant de la Brique 2, contourné localement par la Brique 7 et par cette brique).
 
 ## Règle
 
