@@ -16,6 +16,11 @@ dependencies = [
     "pydantic-settings>=2.5.0",
 ]
 
+[project.scripts]
+souverain-tenant-creer = "brique_01_postgresql.cli:main_creer"
+souverain-tenant-activer = "brique_01_postgresql.cli:main_activer"
+souverain-tenant-desactiver = "brique_01_postgresql.cli:main_desactiver"
+
 [dependency-groups]
 dev = [
     "pytest>=8.3.0",

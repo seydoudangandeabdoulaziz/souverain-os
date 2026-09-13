@@ -275,9 +275,11 @@ dependencies = [
     { name = "argon2-cffi" },
     { name = "brique-01-postgresql" },
     { name = "fastapi" },
+    { name = "jinja2" },
     { name = "pydantic", extra = ["email"] },
     { name = "pydantic-settings" },
     { name = "pyjwt" },
+    { name = "python-multipart" },
 ]
 
 [package.dev-dependencies]
@@ -294,9 +296,11 @@ requires-dist = [
     { name = "argon2-cffi", specifier = ">=23.1.0" },
     { name = "brique-01-postgresql", editable = "briques/brique_01_postgresql" },
     { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "jinja2", specifier = ">=3.1.0" },
     { name = "pydantic", extras = ["email"], specifier = ">=2.9.0" },
     { name = "pydantic-settings", specifier = ">=2.5.0" },
     { name = "pyjwt", specifier = ">=2.9.0" },
+    { name = "python-multipart", specifier = ">=0.0.9" },
 ]
 
 [package.metadata.requires-dev]
@@ -1212,6 +1216,8 @@ name = "souverain-app"
 version = "0.1.0"
 source = { editable = "souverain_app" }
 dependencies = [
+    { name = "brique-01-postgresql" },
+    { name = "brique-02-auth-rbac" },
     { name = "brique-07-dashboard" },
     { name = "brique-08-audit-human-loop" },
     { name = "fastapi" },
@@ -1226,6 +1232,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "brique-01-postgresql", editable = "briques/brique_01_postgresql" },
+    { name = "brique-02-auth-rbac", editable = "briques/brique_02_auth_rbac" },
     { name = "brique-07-dashboard", editable = "briques/brique_07_dashboard" },
     { name = "brique-08-audit-human-loop", editable = "briques/brique_08_audit_human_loop" },
     { name = "fastapi", specifier = ">=0.115.0" },

@@ -13,6 +13,10 @@ __pycache__/
 .env
 *.env.local
 
+# Sauvegardes PostgreSQL (Étape 1 — hygiène de socle)
+# Jamais committer un dump — peut contenir des données réelles un jour.
+backups/
+
 # Docker
 docker-compose.override.yml
 

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>{{ t('gouvernance.titre') }}</title>
+</head>
+<body>
+    <h1>{{ t('gouvernance.titre') }}</h1>
+
+    {% if erreur %}
+    <p class="erreur">{{ erreur }}</p>
+    {% endif %}
+
+    <section>
+        <h2>{{ t('gouvernance.creer_titre') }}</h2>
+        <form method="post" action="/utilisateurs">
+            <input type="hidden" name="jeton_csrf" value="{{ jeton_csrf }}">
+            <label for="email">{{ t('gouvernance.email') }}</label>
+            <input type="email" id="email" name="email" required>
+
+            <label for="mot_de_passe">{{ t('gouvernance.mot_de_passe') }}</label>
+            <input type="password" id="mot_de_passe" name="mot_de_passe" required minlength="12">
+
+            <label for="role">{{ t('gouvernance.role') }}</label>
+            <select id="role" name="role" required>
+                <option value="admin">{{ t('gouvernance.role_admin') }}</option>
+                <option value="analyst">{{ t('gouvernance.role_analyst') }}</option>
+                <option value="auditor">{{ t('gouvernance.role_auditor') }}</option>
+            </select>
+
+            <button type="submit">{{ t('gouvernance.bouton_creer') }}</button>
+        </form>
+    </section>
+
+    <section>
+        <h2>{{ t('gouvernance.liste_titre') }}</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>{{ t('gouvernance.colonne_email') }}</th>
+                    <th>{{ t('gouvernance.colonne_role') }}</th>
+                    <th>{{ t('gouvernance.colonne_statut') }}</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in utilisateurs %}
+                <tr>
+                    <td>{{ u.email }}</td>
+                    <td>
+                        {% if u.user_id == utilisateur_courant_id %}
+                            {{ u.role }} {{ t('gouvernance.action_soi_meme') }}
+                        {% else %}
+                        <form method="post" action="/utilisateurs/{{ u.user_id }}/role" style="display:inline">
+                            <input type="hidden" name="jeton_csrf" value="{{ jeton_csrf }}">
+                            <select name="role" onchange="this.form.requestSubmit()">
+                                <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>{{ t('gouvernance.role_admin') }}</option>
+                                <option value="analyst" {% if u.role == 'analyst' %}selected{% endif %}>{{ t('gouvernance.role_analyst') }}</option>
+                                <option value="auditor" {% if u.role == 'auditor' %}selected{% endif %}>{{ t('gouvernance.role_auditor') }}</option>
+                            </select>
+                        </form>
+                        {% endif %}
+                    </td>
+                    <td>{{ t('gouvernance.statut_actif') if u.is_active else t('gouvernance.statut_desactive') }}</td>
+                    <td>
+                        {% if u.user_id != utilisateur_courant_id %}
+                            {% if u.is_active %}
+                            <form method="post" action="/utilisateurs/{{ u.user_id }}/desactivation">
+                                <input type="hidden" name="jeton_csrf" value="{{ jeton_csrf }}">
+                                <button type="submit">{{ t('gouvernance.action_desactiver') }}</button>
+                            </form>
+                            {% else %}
+                            <form method="post" action="/utilisateurs/{{ u.user_id }}/reactivation">
+                                <input type="hidden" name="jeton_csrf" value="{{ jeton_csrf }}">
+                                <button type="submit">{{ t('gouvernance.action_reactiver') }}</button>
+                            </form>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section>
+        <h2>{{ t('gouvernance.historique_titre') }}</h2>
+        {% if historique %}
+        <ul>
+            {% for entree in historique %}
+            <li>
+                <strong>{{ entree.action }}</strong>
+                &mdash; {{ entree.created_at.strftime('%Y-%m-%d %H:%M') }}
+                {% if entree.acteur_type == 'utilisateur_authentifie' %}
+                    (utilisateur {{ entree.acteur_user_id }})
+                {% else %}
+                    (déclaré, non authentifié : {{ entree.acteur_declare }})
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>{{ t('gouvernance.historique_vide') }}</p>
+        {% endif %}
+    </section>
+</body>
+</html>

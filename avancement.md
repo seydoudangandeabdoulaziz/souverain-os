@@ -28,14 +28,29 @@ VALIDÉE
 | 7 | Dashboard / investigation | **VALIDÉE** |
 | 8 | Audit + Human-in-the-loop | **VALIDÉE** |
 
-## Phase transverse (après le flux principal)
+## Extensions V2 (après le flux principal 0–8)
 
-- RAG (LlamaIndex + ChromaDB) — NON COMMENCÉE
-- Ollama / Mistral — NON COMMENCÉE
-- PQC (Kyber / Dilithium) — NON COMMENCÉE
-- Redis / Celery — NON COMMENCÉE
-- Prometheus / Grafana — NON COMMENCÉE
-- SOUVERAIN-ID complet — NON COMMENCÉE
+| Extension | Nom | Statut |
+|---|---|---|
+| Brique 1 V2 | Gouvernance des tenants (CLI) | **VALIDÉE** |
+| Brique 2 V2 | Gouvernance des utilisateurs (routes web) | **VALIDÉE** |
+
+## Phase transverse — Étapes (ordre consolidé après revue d'architecture)
+
+| Étape | Nom | Statut |
+|---|---|---|
+| 1 | Hygiène de socle (backup/restore, /health, logs structurés) | **VALIDÉE** |
+| 2 | Intégrité des données métier | **VALIDÉE** |
+| 3 | UX/UI (fondations) | NON COMMENCÉE |
+| 4 | Prometheus/Grafana | NON COMMENCÉE |
+| 5 | Test de charge du pipeline actuel | NON COMMENCÉE |
+| 6 | Ollama/Mistral | NON COMMENCÉE |
+| 7 | Sécurité IA/RAG (conception) | NON COMMENCÉE |
+| 8 | RAG | NON COMMENCÉE |
+| 9 | Redis/Celery (conditionnel à l'étape 5) | NON COMMENCÉE |
+| 10 | SOUVERAIN-ID complet | NON COMMENCÉE |
+| 11 | PQC (ML-KEM + ML-DSA) | NON COMMENCÉE |
+| 12 | Résilience inter-États (conception) | NON COMMENCÉE |
 
 ## Détail — Brique 0 (Fondations)
 
@@ -433,7 +448,126 @@ Après ces cinq corrections :
 
 **Brique 8 (Audit trail + Human-in-the-loop) VALIDÉE le 4 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
 
-**Prête pour l'analyse de la phase transverse (RAG/Ollama, PQC, Redis/Celery, Prometheus/Grafana, SOUVERAIN-ID complet) dès demande explicite du fondateur.** Deux besoins réels restent non positionnés dans l'ordre numéroté (`create_tenant()`, notifications citoyens — voir `06_ROADMAP_ET_BRIQUES.md`) et une décision reste en attente (le marqueur `py.typed` manquant de la Brique 2, contourné localement par la Brique 7 et par cette brique).
+## Détail — Extensions V2 : Gouvernance des tenants (Brique 1) et des utilisateurs (Brique 2)
+
+**Statut : VALIDÉES le 6 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+Précédées d'une étape de conception documentée séparément :
+- `docs/MODELISATION_OPERATIONNELLE.md` — modélisation opérationnelle de l'état réel du système (acteurs, permissions, cycle de vie d'une alerte, architecture multi-tenant), rédigée avant toute extension.
+- `docs/DIFFERENCIATION_STRATEGIQUE.md` — analyse de différenciation face aux solutions comparables (Quantexa, Tazama, MaiGuard/PayGuard, GIABA/ECOAML), révisée après recherche externe.
+
+Décisions d'architecture actées avant tout code (plusieurs passes d'analyse, cf. conversation de conception) :
+- **Aucun rôle "Platform Operator"** : la gouvernance des tenants reste CLI-only — analysé et explicitement différé, pas ajouté par défaut. Un `admin` est structurellement scopé à un seul tenant (`shared.users.tenant_id NOT NULL`) ; créer un tenant est une opération cross-tenant qu'aucun rôle actuel ne peut porter sans introduire un concept nouveau, reporté jusqu'à un besoin réel (Phase 2, premier export UEMOA).
+- **Première différenciation fonctionnelle réelle entre `admin` et `analyst`** : `admin` gère les comptes de son tenant (création, changement de rôle, désactivation/réactivation), `analyst` et `auditor` n'ont aucun accès à cette gestion — première fois que les trois rôles se comportent différemment au-delà de la fermeture d'alerte (Brique 8).
+- **Auto-protection** : un `admin` ne peut ni se désactiver, ni se rétrograder lui-même, ni désactiver/rétrograder un utilisateur d'un autre tenant — vérifié par tests d'intégration réels (requêtes forgées) et par la revue manuelle.
+- **Table d'audit transverse unique** : `shared.gouvernance_audit_log`, distincte de `{tenant}.audit_log` (Brique 8, décisions métier sur les alertes) — couvre à la fois la gouvernance des tenants et celle des utilisateurs, avec un champ `domaine` (`'tenant'`/`'utilisateur'`) plutôt que deux tables séparées, décision justifiée par l'existence simultanée des deux besoins au moment de la conception (pas une généralisation prématurée).
+- **Distinction structurelle acteur CLI vs acteur web** : contrainte SQL `acteur_coherent` (pas une simple convention) rendant impossible de confondre une déclaration CLI non authentifiée (`acteur_declare`) avec une identité web authentifiée (`acteur_user_id`, FK réelle vers `shared.users`).
+- **Deux rôles PostgreSQL dédiés, privilèges différents par nécessité** : `souverain_gouvernance_cli` (Brique 1, a besoin de `CREATE` sur la base pour le provisioning de schéma) et `souverain_gouvernance_web` (Brique 2, DML seul sur `shared.users`, aucun privilège DDL) — analyse explicite écartant une simple reprise mécanique du modèle de la Brique 8, la valeur de sécurité du rôle CLI étant différente en nature (l'opérateur a de toute façon un accès serveur complet).
+- **`create_tenant()` réellement atomique** : vérifié avant d'écrire le code, pas supposé — `provision_tenant_schema()` (Brique 1, déjà validée) accepte déjà une connexion en paramètre et son template SQL ne contient aucun contrôle de transaction interne, donc participe telle quelle à la transaction unique (registre + provisioning + audit), sans aucune adaptation.
+- **`reactivate_user()` ne touche jamais `token_version`** : conclusion vérifiée en traçant `get_current_user()` et `login()` (pas supposée) — l'incrémentation irréversible faite par `deactivate_user()` suffit à elle seule à garantir l'invalidation permanente d'un ancien jeton ; testé par la chaîne complète rejouée (création → connexion → JWT v.N → désactivation → révocation → réactivation → ancien JWT toujours invalide → nouvelle connexion → nouveau JWT valide).
+- **Duplication volontaire, pas un import** : l'extension de la Brique 2 duplique la résolution de session par cookie (originaire de la Brique 7) et le mécanisme CSRF (originaire de la Brique 8) plutôt que de les importer — la Brique 2 est censée être en amont de ces deux briques dans le graphe de dépendances, les importer l'aurait inversé.
+
+Bug réel trouvé et corrigé pendant l'écriture du template HTML, avant tout run (pas une correction de validation locale) :
+- `method="patch"` sur un formulaire HTML n'est pas supporté par les navigateurs (retombe silencieusement en `GET`) — l'extension de la Brique 2 n'utilise pas HTMX (contrairement aux Briques 7/8, qui supportent `hx-patch`). Corrigé en `POST` partout, cohérent avec un formulaire HTML simple.
+
+Livré :
+- Brique 1 : `tenant_governance.py` (`create_tenant()`, `activate_tenant()`, `deactivate_tenant()`), `gouvernance_audit.py` (helper d'écriture partagé avec la Brique 2), `gouvernance_cli_config.py`/`gouvernance_cli_connection.py` (pool dédié), `cli.py` (`souverain-tenant-creer`/`-activer`/`-desactiver`), migration `0002_create_gouvernance_audit_log.sql`.
+- Brique 2 : `repository.py` étendu (`+update_user_role()`, `+reactivate_user()`), nouveau sous-package `gouvernance/` (session cookie et CSRF dupliqués, `persistence.py`, `lecture.py`, `routes.py`, `traductions/`, `templates/`), migration `0002_gouvernance_web_role.sql`.
+- `souverain_app/` étendu pour inclure le nouveau routeur (`include_router()`, aucune modification de fichier existant).
+
+Vérifié en environnement de génération (dépôt réel cloné) :
+- `uv sync --all-packages` — résolution propre.
+- `ruff check`/`mypy` — propres sur Brique 1, Brique 2, `souverain_app` ; non-régression confirmée sur Brique 7 et Brique 8.
+- Assemblage complet de l'application sans erreur, 5 nouvelles routes (`/utilisateurs*`) confirmées dans le schéma OpenAPI.
+- 18 nouveaux tests collectés, SKIP proprement (pas d'erreur) sans PostgreSQL disponible.
+
+Un bug réel trouvé et corrigé lors de la validation sur la machine réelle du fondateur (non détectable en environnement de génération sans base réelle) :
+- **GRANT manquant** : `souverain_gouvernance_web` n'avait reçu aucun privilège sur `shared.tenants_registry`, alors que `creer_utilisateur()` y lit `tenant_code` pour générer le SOUVERAIN-ID — `InsufficientPrivilegeError` à la création du tout premier utilisateur via l'interface. Corrigé par l'ajout de `GRANT SELECT ON shared.tenants_registry TO souverain_gouvernance_web` dans la migration `0002` de la Brique 2, après vérification qu'aucun autre privilège n'avait été omis ailleurs dans le module `gouvernance/`.
+
+Après cette correction, sur la machine réelle du fondateur (ThinkPad X1 Carbon Gen 6), PostgreSQL et Neo4j réels démarrés, les deux migrations appliquées dans l'ordre (Brique 1 puis Brique 2) :
+- `uv run pytest` sur l'ensemble du workspace (Briques 0 à 8 + extensions V2) — **156/156 tests passés, 0 échec**.
+- Détail : `test_tenant_governance.py` 6/6 (Brique 1, dont le test de privilège PostgreSQL réel sur `gouvernance_audit_log` et le test de non-suppression du schéma à la désactivation), `test_gouvernance_persistence.py` 6/6 et `test_gouvernance_routes.py` 6/6 (Brique 2, dont la chaîne complète désactivation/réactivation/JWT et le test de privilège réel).
+- Non-régression confirmée sur l'ensemble des Briques 0 à 8.
+
+**Vérification manuelle effectuée par le fondateur, en conditions réelles :**
+- CLI Brique 1 : création d'un tenant de test (`tenant_sn_test`), désactivation, réactivation — chaque opération confirmée tracée dans `shared.gouvernance_audit_log` avec l'`acteur_declare` exact saisi en paramètre, horodatage précis.
+- Interface web Brique 2 : bootstrap du tout premier compte `admin` (remontée manuelle en base du seul compte existant, `azo@gmail.com`, `analyst` → `admin` — cas de démarrage inévitable, aucun compte admin ne préexistait), puis entièrement via l'interface : création de deux comptes supplémentaires (`abdoul@gmail.com` en admin, `aziz@gmail.com` en auditor), désactivation/réactivation d'un compte, historique de gouvernance affiché correctement avec `acteur_user_id` réel (authentifié) — distinct du `acteur_declare` du CLI, confirmant visuellement la séparation structurelle actée à la conception.
+- **RBAC confirmé en conditions réelles, pas seulement par test automatisé** : connexion successive avec un compte `auditor` puis un compte `analyst`, tentative d'accès à `/utilisateurs` dans les deux cas — refus `403` (`"Vous n'avez pas les droits nécessaires pour cette action."`) confirmé pour les deux rôles, seul `admin` passe.
+
+**Extensions V2 (Gouvernance des tenants — Brique 1, Gouvernance des utilisateurs — Brique 2) VALIDÉES le 6 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+## Phase transverse — Revue d'architecture préalable
+
+**Date : 6-7 septembre 2026.** Avant tout code de la phase transverse,
+une revue d'architecture complète a été menée (fondations B0-8+V2,
+chaque capacité transverse envisagée, critères de production, threat
+model) — non résumée ici en détail, voir la conversation de conception
+correspondante. Conclusion : aucun bloqueur absolu, mais l'absence de
+sauvegarde/restauration a été identifiée comme le point le plus
+sérieux. Roadmap consolidée actée, incluant l'ajout d'UX/UI et la
+correction terminologique PQC (ML-KEM/ML-DSA, successeurs
+Kyber/Dilithium renommés par le NIST — FIPS 203/204).
+
+**Ordre validé** : (1) Hygiène de socle, (2) Intégrité des données
+métier, (3) UX/UI, (4) Prometheus/Grafana, (5) Test de charge, (6)
+Ollama/Mistral, (7) Sécurité IA/RAG (conception), (8) RAG, (9)
+Redis/Celery (conditionnel), (10) SOUVERAIN-ID complet, (11) PQC, (12)
+Résilience inter-États.
+
+## Détail — Étape 1 : Hygiène de socle
+
+**Statut : VALIDÉE le 7 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+Périmètre volontairement minimal, acté à l'analyse avant tout code :
+- `/health` (PostgreSQL uniquement — Neo4j explicitement hors périmètre, décision actée pas un oubli), détail minimal exposé publiquement (jamais host/port/db ni message d'erreur brut).
+- Logs structurés JSON sur un seul point d'entrée (`souverain_app`, middleware HTTP) — aucune nouvelle dépendance, aucune modification de brique existante.
+- Backup/restore : un test unique prouvant que la mécanique fonctionne, explicitement PAS une stratégie de production (pas d'automatisation, pas de rétention, pas de stockage distant, pas de chiffrement — tout FUTUR).
+
+Livré :
+- `souverain_app/src/souverain_app/main.py` étendu (endpoint `/health` réutilisant `run_db_healthcheck()` de la Brique 1 inchangée, middleware de logs JSON avec `X-Request-ID`).
+- `scripts/backup_postgres.sh` / `scripts/restore_postgres.sh` (nouveaux, `pg_dump --format=plain`).
+- `tests/integration/test_health_endpoint.py` (3 tests, dans `tests/integration/` — préexistant, prévu pour ce type de test transverse).
+
+Bug réel trouvé et corrigé **en conditions réelles sur la machine du fondateur** (non détectable en environnement de génération, nécessite un vrai `.env` + une vraie tentative de restauration ciblée) :
+- **Priorité des variables d'environnement inversée** : `source .env` à l'intérieur des deux scripts écrasait silencieusement toute variable déjà positionnée par l'appelant (ex. `POSTGRES_DB=autre_base ./restore_postgres.sh ...`). Conséquence réelle : une première tentative de restauration vers une base de test (`souverain_os_test_restore`) s'est exécutée contre `souverain_os` (la vraie base) à la place — confirmation affichée déjà erronée, donc rien ne permettait de le détecter avant coup. Analysé précisément : aucune commande destructrice dans le dump (`DROP`/`DELETE`/`TRUNCATE` absents), tout ce qui a réussi silencieusement était idempotent (restauration d'une base contre elle-même, même instant) — vérifié sans dommage après coup (`SELECT count(*)` sur `tenants_registry`, `transactions`, `alertes`, résultats cohérents : 2/5000/1).
+- Corrigé : les deux scripts préservent maintenant explicitement toute variable déjà définie par l'appelant avant de charger `.env`. `restore_postgres.sh` renforcé en plus : confirmation par re-saisie exacte du nom de la base cible (plus seulement "oui"), rendant ce bug précis structurellement impossible à reproduire silencieusement. Logique de priorité testée isolément avant livraison du correctif.
+
+Vérifié sur la machine réelle du fondateur, contre une vraie instance PostgreSQL :
+- `/health` : `200` PostgreSQL up, testé également en conditions dégradées côté génération (sans PostgreSQL, `503`, détail minimal confirmé, aucune fuite de host/port/db).
+- Cycle complet backup → restauration sur une base réellement vide (`souverain_os_test_restore`) → **zéro erreur** (`CREATE SCHEMA`/`CREATE TABLE`/`COPY 5000` pour les transactions, `COPY 2` pour les tenants, etc.) — contrairement à la première tentative (contre la mauvaise base, déjà peuplée, donc uniquement des `ERROR: already exists`).
+- `SELECT count(*) FROM shared.tenants_registry` sur la base restaurée : `2`, cohérent.
+- Base de test nettoyée après vérification (`DROP DATABASE souverain_os_test_restore`), confirmé par `\l` que `souverain_os` (la vraie base) reste intacte et présente.
+- `uv run pytest` — 84 passed (+3 vs. avant cette étape), même nombre de skip/erreurs qu'avant (limite déjà documentée, absence de PostgreSQL/Neo4j en environnement de génération) — zéro régression.
+
+**Étape 1 (Hygiène de socle) VALIDÉE le 7 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+## Détail — Étape 2 : Intégrité des données métier
+
+**Statut : VALIDÉE le 8 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+Mécanisme : Event Trigger PostgreSQL (`ddl_command_end`, filtré sur `CREATE TABLE`) — décision actée après analyse détaillée de 3 options, avec revirement du fondateur en cours de conception (Option C d'abord choisie provisoirement, puis Option A retenue après que l'analyse a montré que C créait une dépendance architecturale de la Brique 1 vers les structures internes de Briques 4/5, rompant la séparation des responsabilités). Détail complet dans `docs/adr/ADR-003-event-trigger-integrite-donnees.md`.
+
+Décisions clés :
+- **Détection, jamais blocage** : `AFTER UPDATE OR DELETE` sur `{tenant}.alertes`/`{tenant}.detections` uniquement — `INSERT` (fonctionnement normal) jamais journalisé.
+- **`transactions` explicitement exclue** de cette étape (hypertable TimescaleDB, volume et complexité — reporté en FUTUR).
+- **Journalisation sans distinction** légitime/suspecte — une fermeture normale (Brique 8) produit à la fois une entrée `{tenant}.audit_log` (qui a décidé) et `{tenant}.integrite_donnees_log` (que la ligne a changé), redondance assumée.
+- **`SECURITY DEFINER` + `session_user`** (pas `current_user`, qui refléterait le propriétaire de la fonction sous `SECURITY DEFINER`) pour capturer le rôle réel à l'origine de la modification — vérifié concrètement avant implémentation que Brique 8 utilise bien `souverain_brique8_audit` (pas `souverain_admin`) pour ses fermetures.
+- **Limite reconnue, non résolue** : `souverain_admin` (superutilisateur, propriétaire de toutes les tables) pourrait désactiver ou supprimer ce mécanisme — protection contre une modification directe non accompagnée d'une désactivation délibérée, pas contre un compte admin compromis.
+- **Zéro modification de Brique 4/5/7/8** — Brique 1 ne connaît que deux noms de table et un nom de colonne de clé primaire chacune, jamais leur structure complète.
+
+Bugs réels trouvés et corrigés, tous avant validation finale :
+- **En écrivant les tests** (pas en validation locale) : `assurer_protection_integrite()` n'est pas protégée contre une table cible absente (`CREATE TRIGGER ... ON` une table inexistante lève une vraie erreur) — comportement voulu et désormais testé explicitement (la garantie vient de l'appelant, qui vérifie l'existence au préalable, pas d'une protection interne silencieuse).
+- **En test sur machine réelle** : un test (`donnees_avant`/`donnees_apres`) tentait d'indexer directement une colonne `JSONB` comme un dict Python — même piège déjà rencontré et documenté en Brique 7 (asyncpg ne décode pas `JSONB` automatiquement sans codec enregistré), corrigé par `json.loads()` explicite dans le test. Le mécanisme SQL lui-même n'était pas en cause — confirmé par les assertions précédentes du même test, qui passaient déjà.
+- **En test sur machine réelle** : le pool admin (singleton) fuyait entre les tests de `tests/integration/test_health_endpoint.py` (Étape 1, révélé seulement maintenant que PostgreSQL tournait réellement pendant ces tests) — même classe de bug déjà rencontrée pour le driver Neo4j (Brique 7) et les pools dédiés (Brique 8, gouvernance V2). Corrigé par une fixture `autouse` fermant le pool après chaque test.
+
+Vérifié sur la machine réelle du fondateur, PostgreSQL et Neo4j réels démarrés, les deux migrations (`0003`, `0004`) appliquées dans l'ordre :
+- `uv run pytest briques/brique_01_postgresql/tests/test_integrite_donnees.py` — **6/6 passés**, y compris le test de privilège réel (rôle non-superutilisateur ne peut pas toucher l'event trigger) et le test central (création de `alertes` par du SQL brut simulant Brique 5 → trigger attaché automatiquement, sans aucun code applicatif impliqué).
+- `uv run pytest` sur l'ensemble du workspace — **165/165 tests passés, 0 échec**, zéro régression sur les Briques 0 à 8, extensions V2, et Étape 1.
+- Vérification manuelle : `UPDATE` direct sur une alerte réelle de `tenant_ne` → entrée confirmée dans `tenant_ne.integrite_donnees_log`, `role_postgresql = souverain_admin`, horodatée correctement.
+
+**Étape 2 (Intégrité des données métier) VALIDÉE le 8 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+**Prête pour l'analyse de l'Étape 3 (UX/UI) dès demande explicite du fondateur**, conformément à l'ordre validé.
 
 ## Règle
 

@@ -134,3 +134,55 @@ async def deactivate_user(connection: asyncpg.Connection, user_id: uuid.UUID) ->
         "WHERE user_id = $1",
         user_id,
     )
+
+
+async def reactivate_user(connection: asyncpg.Connection, user_id: uuid.UUID) -> None:
+    """
+    Réactive un compte désactivé — bascule is_active à true UNIQUEMENT.
+
+    Ne touche JAMAIS token_version, et c'est volontaire, pas un oubli :
+    deactivate_user() l'a déjà incrémenté de façon irréversible au
+    moment de la désactivation. C'est cette incrémentation passée,
+    jamais décrémentée, qui garantit à elle seule qu'un ancien jeton
+    émis avant la désactivation reste invalide pour toujours — vérifié
+    en traçant get_current_user() (session.py) et login() (api.py) :
+    login() n'incrémente jamais token_version lui-même, il émet un
+    nouveau jeton avec la valeur COURANTE en base, qui sera donc déjà
+    correcte après une simple réactivation. Toucher token_version ici
+    serait inoffensif mais redondant.
+    """
+    await connection.execute(
+        "UPDATE shared.users SET is_active = true, updated_at = now() WHERE user_id = $1",
+        user_id,
+    )
+
+
+class RoleInvalideError(Exception):
+    """Le rôle demandé n'est pas l'une des 3 valeurs autorisées."""
+
+
+async def update_user_role(connection: asyncpg.Connection, user_id: uuid.UUID, role: str) -> None:
+    """
+    Change le rôle d'un utilisateur.
+
+    Raises:
+        RoleInvalideError: rôle hors de {'admin', 'analyst', 'auditor'}
+            (la contrainte CHECK de shared.users le garantit déjà côté
+            base ; cette exception traduit la CheckViolationError brute
+            d'asyncpg en quelque chose d'explicite pour l'appelant).
+
+    Ne contient AUCUNE protection contre l'auto-rétrogradation — c'est
+    la responsabilité de l'appelant (routes.py, Brique 2 V2), qui doit
+    vérifier que user_id != l'utilisateur actuellement authentifié
+    avant même d'appeler cette fonction.
+    """
+    try:
+        await connection.execute(
+            "UPDATE shared.users SET role = $2, updated_at = now() WHERE user_id = $1",
+            user_id,
+            role,
+        )
+    except asyncpg.exceptions.CheckViolationError as exc:
+        raise RoleInvalideError(
+            f"Rôle invalide : {role!r} — attendu 'admin', 'analyst' ou 'auditor'."
+        ) from exc

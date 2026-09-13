@@ -19,6 +19,8 @@ dependencies = [
     "fastapi>=0.115.0",
     "pydantic[email]>=2.9.0",
     "pydantic-settings>=2.5.0",
+    "jinja2>=3.1.0",
+    "python-multipart>=0.0.9",
 ]
 
 [dependency-groups]
@@ -35,7 +37,7 @@ brique-01-postgresql = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/brique_02_auth_rbac"]
-artifacts = ["*.sql"]
+artifacts = ["*.sql", "py.typed", "gouvernance/templates/*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
