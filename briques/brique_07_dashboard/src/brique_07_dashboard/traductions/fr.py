@@ -30,6 +30,10 @@ TEXTES_FR: dict[str, str] = {
     "alerte_detail.statut": "Statut",
     "alerte_detail.patterns": "Motifs impliqués",
     "alerte_detail.fenetre": "Fenêtre d'observation",
+    "alerte_detail.avertissement_score": (
+        "Ce score et ces motifs sont des indices d'investigation, "
+        "pas une preuve de culpabilité."
+    ),
     "alerte_detail.detections_liees": "Détections liées",
     "alerte_detail.chaines_redistribution": "Chaînes de redistribution",
     "alerte_detail.comptes_pont": "Comptes pont",

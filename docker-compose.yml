@@ -46,6 +46,20 @@ services:
       NEO4J_server_memory_heap_initial__size: "512m"
       NEO4J_server_memory_heap_max__size: "1G"
       NEO4J_server_memory_pagecache_size: "512m"
+      # Métriques Prometheus natives : RETIRÉES du périmètre de
+      # l'Étape 4a, définitivement (pas temporairement).
+      # Confirmé sur la machine réelle du fondateur via
+      # `CALL dbms.listConfig() YIELD name WHERE name CONTAINS
+      # 'prometheus'` (résultat vide, alors que la même requête sur
+      # 'heap' retourne bien les réglages existants — donc la requête
+      # fonctionne, c'est le réglage lui-même qui n'existe pas) :
+      # aucun réglage "prometheus" n'est déclaré dans Neo4j 5.26.30
+      # Community Edition, quelle que soit la clé essayée
+      # (metrics.prometheus.*, server.metrics.prometheus.*). La
+      # documentation générale Neo4j ne distingue pas clairement
+      # Community/Enterprise sur ce point. Neo4j reste observable via
+      # ses autres exports natifs (CSV, JMX) si un besoin réel se
+      # présente — hors périmètre 4a, FUTUR si nécessaire.
     ports:
       - "${NEO4J_HTTP_PORT:-7474}:7474"
       - "${NEO4J_BOLT_PORT:-7687}:7687"
@@ -65,15 +79,85 @@ services:
 #
 #   profiles: ["redis"]      -> Phase transverse (Redis/Celery)
 #   profiles: ["ollama"]     -> Phase transverse (Ollama/Mistral)
-#   profiles: ["monitoring"] -> Phase transverse (Prometheus/Grafana)
 #
 # Chaque service sera ajouté explicitement, brique par brique,
 # jamais anticipé.
 # ------------------------------------------------------------
 
+  # --- Étape 4a (Observabilité — Prometheus/Grafana) ---
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    profiles: ["monitoring"]
+    volumes:
+      - ./observabilite/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    # souverain_app tourne en natif sur l'hôte (uv run souverain-app),
+    # pas en conteneur — host.docker.internal ne résout pas nativement
+    # sous Linux (contrairement à Docker Desktop) sans cet ajout,
+    # vérifié avant implémentation. Nécessaire pour scruter
+    # http://host.docker.internal:8080/metrics.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # Aucun port hôte par défaut — décision actée. Accès local
+    # temporaire : voir docker-compose.override.yml.example.
+    networks:
+      - souverain-net
+
+  grafana:
+    image: grafana/grafana:13.2.1
+    profiles: ["monitoring"]
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change_me_grafana}
+      # Provisioning automatique de la source de données au démarrage
+      # (Prometheus) — aucun dashboard pré-construit en MVP (décision
+      # actée, éviter d'imposer une vision de dashboard non validée).
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./observabilite/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    # Aucun port hôte par défaut — décision actée. Accès local
+    # temporaire : voir docker-compose.override.yml.example.
+    networks:
+      - souverain-net
+
+  # --- Étape 4b (Observabilité — métriques PostgreSQL) ---
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+    profiles: ["monitoring"]
+    environment:
+      # Rôle dédié souverain_monitoring (migration 0005, Brique 1) —
+      # privilège pg_monitor uniquement, lecture seule, aucun accès
+      # aux données métier (vérifié par test_monitoring_role.py).
+      DATA_SOURCE_URI: "postgres:5432/${POSTGRES_DB:-souverain_os}?sslmode=disable"
+      DATA_SOURCE_USER: ${MONITORING_DB_USER:-souverain_monitoring}
+      # DATA_SOURCE_PASS : choix de simplicité de déploiement pour ce
+      # MVP, pas un choix de sécurité optimal — DATA_SOURCE_PASS_FILE
+      # (lecture depuis un fichier monté) existe et serait préférable
+      # en industrialisation future, hors périmètre 4b.
+      DATA_SOURCE_PASS: ${MONITORING_DB_PASSWORD:-change_me_monitoring}
+    # Nouveau dans ce fichier : premier depends_on de tout le projet.
+    # condition: service_healthy s'appuie sur le healthcheck déjà
+    # existant du service postgres — évite un premier scrape en échec
+    # si l'exportateur démarre avant que PostgreSQL accepte des
+    # connexions. N'affecte que l'ordre de démarrage sous le profile
+    # monitoring, aucun effet sur postgres/neo4j seuls.
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Aucun port hôte par défaut, même politique qu'en 4a — scruté
+    # uniquement par Prometheus via postgres-exporter:9187. Accès
+    # local ponctuel : docker-compose.override.yml.example.
+    # Aucun collector explicite ajouté : métriques par défaut de
+    # v0.20.1 uniquement, pas de pg_stat_statements (décision actée).
+    networks:
+      - souverain-net
+
 volumes:
   postgres_data:
   neo4j_data:
+  prometheus_data:
+  grafana_data:
 
 networks:
   souverain-net:

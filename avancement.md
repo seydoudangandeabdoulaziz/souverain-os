@@ -41,9 +41,9 @@ VALIDÉE
 |---|---|---|
 | 1 | Hygiène de socle (backup/restore, /health, logs structurés) | **VALIDÉE** |
 | 2 | Intégrité des données métier | **VALIDÉE** |
-| 3 | UX/UI (fondations) | NON COMMENCÉE |
-| 4 | Prometheus/Grafana | NON COMMENCÉE |
-| 5 | Test de charge du pipeline actuel | NON COMMENCÉE |
+| 3 | UX/UI (fondations) | **VALIDÉE** |
+| 4 | Prometheus/Grafana | **VALIDÉE** (4a + 4b) |
+| 5 | Test de charge du pipeline actuel | **VALIDÉE** |
 | 6 | Ollama/Mistral | NON COMMENCÉE |
 | 7 | Sécurité IA/RAG (conception) | NON COMMENCÉE |
 | 8 | RAG | NON COMMENCÉE |
@@ -567,7 +567,552 @@ Vérifié sur la machine réelle du fondateur, PostgreSQL et Neo4j réels démar
 
 **Étape 2 (Intégrité des données métier) VALIDÉE le 8 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
 
-**Prête pour l'analyse de l'Étape 3 (UX/UI) dès demande explicite du fondateur**, conformément à l'ordre validé.
+## Détail — Étape 3 : UX/UI (fondations)
+
+**Statut : VALIDÉE le 14 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz).**
+
+Précédée d'un audit UX/UI explicite (pas seulement une passe de style),
+menée sous trois angles persona (admin, analyste, auditeur) contre les
+écrans réels (captures d'écran fournies par le fondateur). Verdict de
+l'audit : socle CSS fonctionnel mais interface encore "back-office
+technique", pas institutionnelle — classé en CRITIQUE / IMPORTANT /
+AMÉLIORATION / FUTUR, périmètre validé explicitement avant tout code :
+#1, #2, #4 à #13 pour ce cycle ; #1b et #3 (résolution email dans
+l'historique de gouvernance — nécessite une nouvelle requête SQL) et
+#14 à #17 (vraie visualisation de graphe, page d'audit transverse,
+responsive, design system Jinja) explicitement reportés.
+
+Contraintes strictes actées avant implémentation : aucune nouvelle
+route, aucune nouvelle requête SQL, aucune modification du modèle de
+données ni du RBAC, aucune nouvelle dépendance JS, `confirm()` natif
+uniquement.
+
+Deux vérifications empiriques faites avant tout code (pas supposées) :
+- **Changement de rôle** (Brique 2 V2) : confirmé par lecture du code
+  que le `<select>` de rôle faisait un `onchange="this.form.requestSubmit()"`
+  — auto-soumission instantanée, zéro confirmation. Une modification
+  CSS seule ne pouvait pas corriger ce point.
+- **Contexte utilisateur déjà disponible** : `AuthenticatedUser`
+  (Brique 2, session déjà résolue à chaque requête) porte `role` et
+  `tenant_id` gratuitement. `tenant_id` est un UUID, pas un code
+  lisible — afficher un tenant lisible (#1b) nécessiterait une
+  requête de plus, donc explicitement exclu de ce cycle.
+- **Historique de gouvernance** (Brique 2 V2) : confirmé par lecture
+  de `lire_historique_gouvernance()` que `acteur_user_id`/`cible_id`
+  sont retournés en UUID bruts, jamais résolus en email — contrairement
+  à `EntreeAudit` (Brique 8) qui résout déjà l'email. Écart de données
+  réel, pas un oubli de template — traité comme #3, hors périmètre.
+
+Décision d'architecture actée pour exposer le rôle sans nouvelle
+requête (#1) : `routes/alertes.py` (Brique 7) ne recevait que
+`MetadonneesTenant` (via `tenant_valide()`), pas `AuthenticatedUser`
+directement, alors que `tenant_valide()` le résout déjà en interne.
+Ajout d'un second `Depends(get_current_user_from_cookie)` sur les 2
+routes qui rendent `base.html` — vérifié que FastAPI met en cache la
+résolution d'une dépendance par requête (`use_cache=True` par défaut),
+donc **zéro requête SQL supplémentaire**, seul le résultat déjà
+calculé devient accessible au handler. Même principe côté Brique 2 V2
+(`gouvernance/routes.py`) : `utilisateur` était déjà résolu et présent
+dans `_rendre_page()`, une seule ligne ajoutée au contexte.
+
+Livré (12 fichiers, zéro nouveau fichier `.py`, une seule nouvelle
+Python logique additive — l'ajout de `Depends` ci-dessus) :
+- `briques/brique_07_dashboard/.../static/souverain.css` : système de
+  badges (rôle, statut, score), tags de patterns, hiérarchie de
+  boutons (primaire/secondaire/danger), échelle typographique h1-h3,
+  icônes CSS sur `.erreur`/`.succes`, classe `.avertissement` distincte
+  de `.vide`.
+- `base.html`, `alertes_liste.html`, `alerte_detail.html`,
+  `tenant_sans_donnees.html`, `traductions/fr.py` (Brique 7) : bandeau
+  rôle + état actif nav, bandeau "indice d'investigation, pas une
+  preuve de culpabilité" sur le détail d'alerte, badges/tags appliqués,
+  message de contexte réel distinct de l'état vide simple.
+- `routes/alertes.py` (Brique 7) : exposition du rôle (voir ci-dessus).
+- `gouvernance/routes.py`, `liste_utilisateurs.html`,
+  `gouvernance/traductions/fr.py` (Brique 2 V2) : badge rôle + état
+  actif nav, **confirmation native avant tout changement de rôle**
+  (`confirm()` + restauration de la valeur précédente si annulé),
+  boutons hiérarchisés, badges statut/rôle, historique restylé avec
+  les mêmes classes que la Brique 8 (`.audit-historique`) pour un
+  langage visuel unifié — contenu (UUID bruts) inchangé, hors périmètre.
+- `fermeture_fragment.html` (Brique 8) : un seul attribut `class`
+  ajouté sur le bouton de fermeture existant — aucune autre ligne
+  touchée.
+- `tests/integration/test_socle_ux_ui.py` : étendu (7 assertions au
+  total) — vérifie que `/static/souverain.css` est servi et contient
+  les classes attendues, et que `/login` ne contient plus de `<style>`
+  inline. Fonctionne sans PostgreSQL/Neo4j par construction (aucune
+  des deux pages testées n'en dépend).
+
+Vérifié en environnement de génération (sans PostgreSQL/Neo4j
+disponibles) :
+- `uv run pytest tests/integration/test_socle_ux_ui.py` — **2/2 passés**.
+- `uv run pytest` sur l'ensemble du workspace — **86 passed**, 48
+  erreurs — **toutes confirmées `ConnectionRefusedError`** (classification
+  explicite du type d'exception, pas une supposition), aucune nouvelle
+  erreur, aucune régression de collecte introduite par le changement de
+  signature des routes `/alertes` et `/alertes/{id}`.
+- `uv run ruff check` / `uv run mypy src` — propres sur les Briques 7,
+  2 et 8.
+
+Vérifié manuellement par le fondateur dans un vrai navigateur, contre
+une checklist dédiée (bandeau rôle, état actif de la nav, badges,
+tags, confirmation de changement de rôle dans ses deux issues —
+annuler et confirmer —, boutons hiérarchisés, historique restylé) :
+**conforme, aucune anomalie remontée.** Un point d'incertitude soulevé
+sur l'affichage du graphe d'investigation a été vérifié comme non lié
+à cette étape (`git diff` confirme que `routes/alertes.py` (partie
+`/graphe`) et `graphe_fragment.html` n'ont reçu aucune modification
+dans ce cycle) — écarté de la validation, à traiter séparément si
+besoin (dépend de la synchronisation Neo4j, Brique 6, hors périmètre
+UX/UI).
+
+Explicitement non traité dans ce cycle, le fondateur ayant exprimé le
+souhait d'une amélioration visuelle plus poussée au-delà du socle :
+reporté à un futur cycle de conception dédié (COMPRENDRE → ARCHITECTURER
+séparé), pas ajouté silencieusement ici. Recoupe les points #14 à #17
+déjà identifiés par l'audit (design system réutilisable, vraie
+identité visuelle, densité d'information retravaillée, visualisation
+de graphe interactive).
+
+**Étape 3 (UX/UI — fondations) VALIDÉE le 14 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz).**
+
+## Détail — Étape 4a : Observabilité (Prometheus + Grafana)
+
+**Statut : VALIDÉE ET GELÉE le 19 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+Précédée d'un cycle de conception en trois passes : COMPRENDRE (inspection
+exhaustive de `docker-compose.yml` — services, profiles, ports, healthchecks,
+absence de toute limite `resources:`), une proposition initiale du fondateur,
+puis une contre-proposition motivée du modèle (découpage 4a/4b pour isoler
+le seul risque touchant une brique verrouillée), les deux comparées
+point par point avant décision. Périmètre 4a validé : Prometheus,
+Grafana, `/metrics` FastAPI (instrumentation manuelle), provisioning
+Grafana minimal, profile `monitoring` réutilisé. **postgres-exporter et
+la migration Brique 1 explicitement exclus**, réservés à l'Étape 4b.
+
+Décisions actées avant tout code :
+- Budget RAM de travail : 13 Go (chiffre du fondateur, distinct des
+  14,87 Go documentés en Brique 6 — écart signalé, non tranché en
+  silence).
+- `prometheus-client` seul, instrumentation manuelle (pas d'auto-
+  instrumentator) — le label `chemin` utilise le patron de route
+  matché (`request.scope["route"].path`), jamais `request.url.path`
+  brut, pour éviter toute fuite d'UUID de compte/tenant en label
+  Prometheus et tout risque de cardinalité non bornée.
+- Aucun port hôte par défaut pour Prometheus/Grafana — accès local
+  ponctuel documenté dans `docker-compose.override.yml.example`
+  (mécanisme déjà existant depuis la Brique 0, jamais mobilisé avant
+  cette étape).
+- Aucune limite `resources:` ajoutée (cohérent avec leur absence sur
+  tout le fichier).
+- Pas de `pg_stat_statements`, pas de métriques métier du pipeline
+  batch (B3-B6) en MVP.
+
+Deux erreurs réelles commises et corrigées **avant** la machine réelle
+du fondateur, trouvées par vérification systématique plutôt que
+suppositions :
+- Versions d'images figées à l'analyse (`prom/prometheus:v3.0.1`,
+  `grafana/grafana-oss:11.4.0`) vérifiées obsolètes par recherche web
+  avant tout code — corrigées en `prom/prometheus:v3.14.0` et
+  `grafana/grafana:13.2.1` (le dépôt `grafana-oss` n'est plus mis à
+  jour depuis Grafana 12.4.0 selon Grafana Labs).
+- `souverain_app` tourne en natif sur l'hôte (`uv run souverain-app`),
+  jamais en conteneur — vérifié avant d'écrire la config de scrape.
+  `host.docker.internal` ne résout pas nativement sous Linux
+  (contrairement à Docker Desktop) : `extra_hosts:
+  ["host.docker.internal:host-gateway"]` ajouté au service
+  `prometheus`.
+
+**Incident réel en conditions réelles — métriques Neo4j natives,
+retirées du périmètre après investigation empirique complète :**
+trois tentatives de nom de réglage (`metrics.prometheus.endpoint`,
+`server.metrics.prometheus.endpoint`, `server.metrics.prometheus.enabled`
+seul) toutes rejetées par `strict_validation` sur la machine réelle du
+fondateur (Neo4j 5.26.30 Community), malgré une documentation Neo4j
+générale qui les présente comme valides sans distinguer clairement
+Community/Enterprise. Le premier échec a fait crasher le conteneur
+Neo4j (aucun `restart:` défini) — restauré dans son état connu-
+fonctionnel (Brique 6) à chaque itération, jamais laissé cassé entre
+deux tentatives. Preuve définitive obtenue directement depuis le
+Neo4j du fondateur, pas depuis une doc externe :
+`CALL dbms.listConfig() YIELD name WHERE name CONTAINS 'prometheus'`
+retourne une liste vide, alors que la même requête sur `'heap'`
+retourne bien des résultats — confirmant que la requête fonctionne et
+que c'est le réglage lui-même qui n'est pas déclaré dans cette
+édition. **Conclusion : métriques Prometheus natives non disponibles
+sur Neo4j Community 5.26.30, retirées définitivement du périmètre
+4a** (pas reportées à 4b — un besoin réel non satisfait, CSV/JMX
+restant une alternative possible en FUTUR si nécessaire un jour).
+
+Second incident, réseau, sans lien avec la configuration du dépôt :
+la cible Prometheus `souverain_app` restait `DOWN` (timeout) malgré
+`/health` répondant en local et `host.docker.internal` résolvant
+correctement (`172.17.0.1`, vérifié depuis le conteneur Prometheus) —
+cause trouvée par élimination méthodique : `ufw` actif sur la machine
+du fondateur bloquait le trafic entrant depuis le réseau Docker
+`souverain-net` (sous-réseau réel `172.18.0.0/16`, vérifié via
+`docker network inspect` — une première règle sur `172.17.0.0/16`,
+le sous-réseau du bridge Docker par défaut, était insuffisante).
+Réglage machine locale, hors du dépôt versionné — non documenté dans
+un fichier projet, mais tracé ici pour toute réinstallation future.
+
+Livré :
+- `briques/brique_07_dashboard/.../static/` : aucun changement (rappel
+  — 4a ne touche aucun fichier de Brique 7, contrairement à l'Étape 3).
+- `docker-compose.yml` : services `prometheus`/`grafana` sous
+  `profiles: ["monitoring"]`, réseau `souverain-net`, aucun port hôte,
+  2 volumes nommés (`prometheus_data`, `grafana_data`), `extra_hosts`
+  sur `prometheus`. Aucune métrique Neo4j (retirée, voir ci-dessus).
+- `observabilite/prometheus/prometheus.yml` : scrute uniquement
+  `souverain_app` (`host.docker.internal:8080`).
+- `observabilite/grafana/provisioning/datasources/prometheus.yml` :
+  source de données provisionnée automatiquement, aucun dashboard
+  pré-construit.
+- `.env.example` : `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD`.
+- `docker-compose.override.yml.example` : exemple commenté pour
+  ouvrir ponctuellement les ports Grafana/Prometheus en local.
+- `souverain_app/src/souverain_app/main.py` : `/metrics`
+  (2 métriques — compteur de requêtes, histogramme de durée — label
+  `chemin` = patron de route, jamais brut).
+- `souverain_app/pyproject.toml` : dépendance `prometheus-client`
+  (première dépendance tierce de ce module) ; contournement mypy pour
+  un manque préexistant découvert en vérifiant (Brique 2 sans
+  `py.typed`, même contournement déjà en place en Brique 7 — pas une
+  régression de cette étape).
+- `tests/integration/test_observabilite.py` : 3 tests (format
+  d'exposition valide, label = patron de route, absence d'UUID),
+  aucun ne dépend de PostgreSQL/Neo4j.
+
+Vérifié en environnement de génération (sans Docker, comme pour
+chaque étape précédente) :
+- `uv run pytest tests/integration/test_observabilite.py` — 3/3.
+- `uv run pytest` — 89 passed, zéro régression introduite.
+- `ruff check` / `mypy src` — propres sur `souverain_app` et les 4
+  briques adjacentes (B1, B2, B7, B8).
+- Validation YAML de `docker-compose.yml` et des 2 fichiers
+  `observabilite/` — structure conforme.
+
+Vérifié sur la machine réelle du fondateur, après résolution des deux
+incidents ci-dessus :
+- `uv run pytest` — **170/170 tests passés**, PostgreSQL et Neo4j
+  réels démarrés.
+- `docker compose ps` — 4 conteneurs (`postgres`, `neo4j`,
+  `prometheus`, `grafana`) sains, sans port hôte sur les deux
+  derniers par défaut.
+- Cible Prometheus `souverain_app` : **UP**, 159 ms de latence.
+- Grafana : source de données Prometheus provisionnée automatiquement
+  et marquée par défaut, sans action manuelle — confirmé visuellement.
+- `docker stats --no-stream`, les 4 conteneurs ensemble — **première
+  mesure réelle de PostgreSQL de tout ce projet** (jamais mesuré
+  avant, y compris aux Briques 1 et 5) :
+
+| Conteneur | RAM mesurée |
+|---|---|
+| Prometheus | 88.6 MiB |
+| Grafana | 425.3 MiB (au-dessus de l'estimation initiale 150-250 Mo) |
+| Neo4j | 136.5 MiB au repos |
+| PostgreSQL | 141 MiB |
+| **Total** | **~791 MiB** |
+
+Sur le budget de travail de 13 Go : **~12,2 Go de marge restante** —
+écart Grafana sans aucune conséquence sur la faisabilité mémoire.
+
+**Étape 4a (Observabilité — Prometheus/Grafana) VALIDÉE ET GELÉE le 19 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+## Détail — Étape 4b : Observabilité PostgreSQL (postgres-exporter + rôle monitoring)
+
+**Statut : VALIDÉE le 19 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+Précédée d'un cycle de conception détaillé (versions vérifiées par
+recherche web : `postgres_exporter` v0.20.1, image
+`quay.io/prometheuscommunity/postgres-exporter`, port 9187,
+mécanisme `DATA_SOURCE_URI`/`DATA_SOURCE_USER`/`DATA_SOURCE_PASS`
+confirmé comme la convention actuelle, pas l'ancien
+`DATA_SOURCE_NAME`). Relecture du fondateur avant implémentation :
+architecture validée, ajout de 2 tests supplémentaires
+(`test_role_n_est_pas_superuser`, `test_role_peut_se_connecter_a_la_base`),
+et un point de vigilance sur le mot de passe de la migration —
+vérifié par grep direct que c'est exactement le mécanisme déjà
+utilisé 3 fois dans ce projet (audit B8, gouvernance_cli B1,
+gouvernance_web B2) : placeholder SQL en dur, changé via `ALTER ROLE`
+avant tout déploiement réel, pas une lacune propre à cette migration.
+
+Migration `0005_create_monitoring_role.sql` (Brique 1, verrouillée) :
+rôle `souverain_monitoring`, membre de `pg_monitor` uniquement —
+**aucune boucle par tenant nécessaire**, contrairement au rôle
+d'audit de la Brique 8 : `pg_monitor` est un privilège cluster-level
+(`pg_stat_activity`, `pg_stat_database`), pas accordé schéma par
+schéma. Aucun module de connexion Python de production créé pour ce
+rôle (contrairement aux 3 précédents) : aucun code applicatif ne se
+connecte jamais sous `souverain_monitoring`, seul l'exportateur
+(binaire Go, hors Python) le fait — un module dédié aurait été du
+code mort, le pool de test est construit directement dans
+`test_monitoring_role.py`.
+
+Service `postgres-exporter` (`docker-compose.yml`, profile
+`monitoring`) : premier `depends_on` de tout ce fichier
+(`postgres: condition: service_healthy`), validé explicitement par
+le fondateur comme sans risque (n'affecte que l'ordre de démarrage
+sous ce profile). Aucun port hôte par défaut, même politique qu'en
+4a. Aucun collector explicite ajouté (métriques par défaut v0.20.1
+uniquement), pas de `pg_stat_statements` (décision actée en 4a,
+reconfirmée).
+
+**Contrainte d'usage découverte en conditions réelles, à retenir** :
+à cause du `depends_on`, **toute commande touchant `postgres-exporter`
+(`up`, `logs`, `restart`) exige `--profile postgres` en plus de
+`--profile monitoring`** — `--profile monitoring` seul fait échouer
+Compose (`service "postgres-exporter" depends on undefined service
+"postgres"`). Pas un bug, une conséquence directe et attendue du
+`depends_on`, mais suffisamment non intuitive pour être documentée
+ici plutôt que redécouverte plus tard :
+```
+docker compose --profile postgres --profile neo4j --profile monitoring up -d
+docker compose --profile postgres --profile neo4j --profile monitoring logs postgres-exporter --tail 30
+```
+
+Livré :
+- `briques/brique_01_postgresql/migrations/0005_create_monitoring_role.sql`.
+- `briques/brique_01_postgresql/tests/test_monitoring_role.py` — 6
+  tests (existence, appartenance `pg_monitor`, non-superuser,
+  `CONNECT` réel, refus d'écriture, refus de lecture des données
+  tenant).
+- `docker-compose.yml` — service `postgres-exporter`.
+- `.env.example` — `MONITORING_DB_USER`/`MONITORING_DB_PASSWORD`.
+- `observabilite/prometheus/prometheus.yml` — cible `postgres`
+  (`postgres-exporter:9187`).
+
+Manque préexistant découvert en vérifiant, non lié à cette étape,
+signalé et non corrigé (hors périmètre) : `mypy tests/` sur
+l'ensemble du dossier de tests de la Brique 1 révèle 3 erreurs dans
+`test_connection.py` (jamais vérifié ainsi avant — seul `mypy src/`
+et des fichiers de test isolés l'avaient été jusqu'ici). Même nature
+que le manque `py.typed` découvert sur `souverain_app` en 4a.
+
+Vérifié en environnement de génération (sans Docker) : `ruff`/`mypy`
+propres, 6 tests collectés, suite complète 89 passed/39 skipped
+(+6 propres)/48 erreurs (toutes `ConnectionRefusedError`, rien de
+nouveau), YAML valide.
+
+Vérifié sur la machine réelle du fondateur, cycle complet incluant un
+incident réel et sa résolution :
+- Migration appliquée avec succès (`docker exec ... psql ... < 0005...sql`).
+- `uv run pytest briques/brique_01_postgresql/tests/test_monitoring_role.py` — **6/6 passés**.
+- `uv run pytest` (suite complète, PostgreSQL + Neo4j réels) — **176/176 passés**.
+- Logs `postgres-exporter` : `Established new database connection` +
+  détection de version PostgreSQL 16.6 — authentification confirmée.
+- `docker exec ... wget -qO- http://localhost:9187/metrics` —
+  métriques PostgreSQL réelles confirmées (`pg_database_size_bytes`,
+  `pg_locks_count`, `pg_exporter_last_scrape_error 0`), pas seulement
+  les métriques internes du processus Go de l'exportateur.
+- Cible Prometheus `postgres` (`/targets`) — **UP**, 170 ms.
+- **Rollback réel testé** : `REVOKE pg_monitor FROM
+  souverain_monitoring; DROP ROLE IF EXISTS souverain_monitoring;`
+  exécuté sans erreur → rôle confirmé absent (`SELECT ... pg_roles`,
+  0 ligne) → redémarrage de l'exportateur → **échec d'authentification
+  réel capturé dans les logs** (`password authentication failed for
+  user "souverain_monitoring"`), preuve directe que le rôle contrôle
+  effectivement l'accès, pas seulement en théorie → migration
+  réappliquée → exportateur redémarré → 6/6 tests de nouveau au vert.
+
+**Étape 4b (Observabilité PostgreSQL) VALIDÉE le 19 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+**Étape 4 (Observabilité — Prometheus/Grafana) entièrement close, 4a et 4b comprises.**
+
+**Prête pour l'analyse de l'Étape 5 (Test de charge du pipeline actuel) dès demande explicite du fondateur**, conformément à l'ordre validé — sauf si le fondateur préfère d'abord ouvrir le cycle de conception UX/UI approfondi resté en attente depuis l'Étape 3.
+
+## Détail — Étape 5 : Test de charge du pipeline B3→B4→B5→B6→B7/B8
+
+**Statut : VALIDÉE le 19 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+Précédée d'une analyse complète (COMPRENDRE) avant tout code : le
+pipeline n'est pas homogène — B3 à B6 sont des jobs batch CLI
+(déclenchement manuel), seul B7/B8 est un service HTTP continu.
+Constat structurant : seul B3 a un volume configurable
+(`--nb-transactions`), B4/B5/B6 traitent tout ce qui existe pour le
+tenant donné. Limite déjà documentée (validation Brique 5)
+confirmée applicable ici : le générateur B3 ne peut jamais produire
+de compte cumulant deux patterns différents (préfixes de compte
+fixes par pattern) — donc **aucun volume ne fera apparaître
+d'alerte réelle** avec le générateur actuel.
+
+Décisions actées avant exécution :
+- **Scénario B (scoring/alertes réel) : option (a) retenue** — limite
+  du générateur acceptée provisoirement, aucun développement de
+  générateur composite avant ce test. Réévaluation de la qualité de
+  détection reportée à une campagne dédiée, distincte de l'Étape 5.
+- **Scénario C (charge HTTP B7/B8) : `asyncio`+`httpx`**, pas
+  `locust` — zéro nouvelle dépendance (choix explicite pour cette
+  étape, cohérent avec la discipline déjà appliquée en 4a/4b).
+- **Paliers retenus : 5 000 → 20 000 → 50 000** (la borne
+  "recommandée" du générateur B3, correspondant à l'ordre de
+  grandeur de la cible de débit du document fondateur). Pas de test
+  au-delà de 50 000 pour cette première campagne.
+- **13 Go = seuil d'alerte, pas arrêt automatique** — arrêt
+  seulement en cas de pression mémoire critique, OOM, instabilité ou
+  dégradation dangereuse (ajustement du fondateur au protocole
+  initialement proposé).
+- **Vérification explicite post-nettoyage entre paliers** (PostgreSQL
+  ET Neo4j confirmés vides avant de poursuivre) — ajout du fondateur
+  au protocole, appliqué aux deux transitions de palier.
+- Débit B3 et débit global B3→B6 **calculés séparément** (ajustement
+  du fondateur) — le débit global était dominé par B6, un débit B3
+  seul isolé était nécessaire pour ne pas le masquer.
+- La mesure <500 ms Neo4j est **conservée mais jamais présentée comme
+  une validation de la cible officielle 1M nœuds** (ajustement du
+  fondateur) — les volumes testés ici restent trois ordres de
+  grandeur en dessous de ce scénario.
+
+Isolation : tenant dédié `tenant_test_charge` (jamais mélangé à
+`tenant_ne`), créé via `souverain-tenant-creer`, avec un compte admin
+de test bootstrapé par script ponctuel (même geste que le tout
+premier bootstrap de `tenant_ne`, réutilisant les fonctions réelles
+de la Brique 2 — `hash_password`, `generate_souverain_id`,
+`create_user` — jamais de SQL brut inventé).
+
+Livré : `charge/scenario_c_http.py` — nouveau répertoire transverse
+(même principe que `observabilite/` en Étape 4), script autonome hors
+suite pytest. Se connecte une fois, extrait les IDs d'alertes et les
+URLs de fragment graphe réelles depuis le HTML retourné (même
+attribut `hx-get` que le navigateur réel), lance N coroutines
+concurrentes sur un cycle pondéré (`/alertes` 40%, détail 35%, graphe
+25%). Aucune métrique dupliquée côté client au-delà d'un résumé
+immédiat — la latence de référence reste
+`souverain_http_request_duration_seconds` (Prometheus, Étape 4a).
+Vérifié statiquement avant livraison (`ruff`, `mypy` propres) — jamais
+exécuté avant validation explicite du fondateur, conformément à la
+méthode.
+
+**Résultats — campagne complète (5 000 / 20 000 / 50 000) :**
+
+| Palier | Volume | B3 | B4 | B5 | B6 | Débit B3 | Débit global B3→B6 | RAM max Postgres | RAM max Neo4j | Scénario C p50/p95 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 5 000 | 2,216s | 0,908s | 0,777s | 8,367s | 2256 tx/s | 408 tx/s | 193,7 MiB | 998,1 MiB | 119,8/205,0 ms |
+| 2 | 20 000 | 5,278s | 1,099s | 0,730s | 9,210s | 3790 tx/s | 1225 tx/s | 160,8 MiB | 1,312 GiB | 121,3/195,6 ms |
+| 3 | 50 000 | 13,421s | 1,699s | 0,588s | 19,026s | 3726 tx/s | 1440 tx/s | 191,8 MiB | 1,51 GiB | 120,5/208,0 ms |
+
+Chaque palier suivi d'une vérification explicite post-nettoyage
+(`SELECT count(*)` PostgreSQL + `MATCH ... RETURN count(n)` Neo4j,
+filtré par `tenant_id`) — confirmée à `0` avant chaque transition,
+sans exception.
+
+**Constats :**
+- Aucune dégradation détectée jusqu'à 50 000 transactions — le débit
+  global s'améliore avec le volume (coût fixe de B6 qui s'amortit
+  sur un plus gros lot), pas l'inverse.
+- Scénario B : 0 alerte à chaque palier, conforme à la limite actée
+  — rien de nouveau appris sur le scoring réel sous charge, comme
+  attendu de l'option (a).
+- Scénario C : latence stable (~120 ms p50) sur les 3 paliers, 0
+  erreur HTTP sur 13 750 requêtes cumulées au total.
+- RAM PostgreSQL : stable entre paliers (nettoyage efficace).
+- **Point de vigilance réel, à ne pas glisser sous le tapis** : RAM
+  Neo4j croît avec le volume (998 Mo → 1,31 Go → 1,51 Go) et **atteint
+  quasiment le plafond `heap_max=1G` + `pagecache=512m` déjà configuré
+  en Brique 6** pour un contexte de quelques milliers de transactions.
+  Pas un échec de ce test, mais un signal explicite pour toute future
+  campagne à volume supérieur : ce plafond devra être révisé avant
+  d'aller au-delà de 50 000, pas aujourd'hui.
+
+Nettoyage final effectué : `souverain-tenant-desactiver` puis
+`DROP SCHEMA tenant_test_charge CASCADE` (confirmé par le fondateur,
+6 objets supprimés en cascade, aucune perte de données réelle — le
+schéma était déjà vide après les `TRUNCATE` de fin de campagne).
+
+**Étape 5 (Test de charge du pipeline actuel) VALIDÉE le 19 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+**Prête pour l'analyse de l'Étape 6 (Ollama/Mistral) dès demande explicite du fondateur**, conformément à l'ordre validé — sauf si le fondateur préfère d'abord ouvrir le cycle de conception UX/UI approfondi resté en attente depuis l'Étape 3, ou traiter le point de vigilance Neo4j (plafond mémoire) avant d'aller plus loin.
+
+## EN COURS — Campagne fonctionnelle (parcours analyste, 6 scénarios de fraude synthétique)
+
+**Statut : EN COURS, non validée — décidée après l'Étape 5, avant l'Étape 6.**
+
+Décision du fondateur : l'Étape 5 a démontré la capacité de charge
+(jusqu'à 50 000 transactions) mais pas le parcours utilisateur réel
+(0 alerte générée à chaque palier, cohérent avec la limite déjà
+actée du générateur B3). Cette campagne comble ce manque avant
+d'aborder l'UX/UI approfondi ou l'Étape 6 (Ollama/Mistral), pour ne
+pas laisser une future couche explicative masquer des lacunes
+fonctionnelles non vérifiées du cœur du système.
+
+Principe : **aucune modification de B4/B5/B6**. Les transactions de
+test sont insérées directement en SQL (le générateur B3 ne peut pas
+produire de comptes multi-patterns, limite déjà documentée) pour
+déclencher les règles de détection déjà implémentées, jamais pour
+fabriquer artificiellement un résultat.
+
+Isolation : tenant dédié `tenant_test_fonctionnel`
+(`tenant_id=916da41b-9b5b-44ea-8a95-2b92ac42592b`), créé le 20
+septembre 2026, jamais mélangé à `tenant_ne` ni à
+`tenant_test_charge` (déjà nettoyé, Étape 5).
+
+**6 scénarios conçus et validés par le fondateur, SQL complet
+rédigé** :
+
+| # | Pattern | Poids | Score attendu | Alerte attendue |
+|---|---|---|---|---|
+| 1 | micro_fractionnement | 20 | 20 | Non |
+| 2 | transactions_nocturnes | 15 | 15 | Non |
+| 3 | structure_etoile | 25 | 25 | Non |
+| 4 | flux_frontalier | 10 | 10 | Non |
+| 5 | étoile + fractionnement + nocturne | 60 | 60 | **Oui** |
+| 6 | compte_pivot | 30 | 30 | Non |
+
+Date de référence unique : `2026-09-20`, horodatages exprimés avec
+offset Niger explicite (`+01`), choisis loin des frontières 22h/4h
+(voir point technique ci-dessous).
+
+**Point technique vérifié et documenté (pas corrigé — hors
+périmètre B4)** : `asyncpg` décode les colonnes `TIMESTAMPTZ` via le
+protocole binaire comme un instant absolu, toujours retourné en
+`datetime` UTC-aware, indépendamment du fuseau de session
+PostgreSQL. La règle `transactions_nocturnes`
+(`brique_04_detection/regles/nocturne.py`) lit `.hour` en supposant
+implicitement (docstring) que c'est déjà l'heure locale Niger — ce
+n'est vrai qu'au milieu de la fenêtre, pas à ses bornes exactes
+(22h00-22h59 et 03h00-03h59 Niger local sont mal classés par un
+décalage silencieux de -1h). **Bug de bord latent, jamais visible
+jusqu'ici** (le générateur B3 ne tape jamais exactement sur cette
+frontière). Contournement pour cette campagne : tous les horaires
+nocturnes choisis à 23h00-23h45, largement à l'intérieur de la
+fenêtre — aucune modification de B4. À traiter par décision
+explicite séparée si le fondateur le souhaite un jour.
+
+**Bug réel rencontré et corrigé pendant l'exécution (pas dans le
+SQL initial — dans l'ordre des opérations)** : sur un tenant neuf,
+la colonne `is_synthetic` de `{tenant}.transactions` n'existe pas
+tant que le générateur B3 n'a jamais tourné dessus — elle est
+ajoutée par une logique d'auto-réparation **dans B3 lui-même**
+(`ingestion.py`, idempotente), pas par le schéma de base provisionné
+à la création du tenant. Comme les scénarios contournent
+volontairement B3 (INSERT SQL direct), cette auto-réparation n'a
+jamais eu l'occasion de s'exécuter. Corrigé par l'exécution manuelle
+de l'instruction idempotente déjà écrite dans B3 (pas une
+modification de B3, une application ponctuelle de son propre
+correctif documenté) :
+```sql
+ALTER TABLE tenant_test_fonctionnel.transactions
+ADD COLUMN IF NOT EXISTS is_synthetic BOOLEAN NOT NULL DEFAULT false;
+```
+Cette colonne existe désormais sur `tenant_test_fonctionnel` — pas
+besoin de rejouer ce correctif pour les scénarios 2 à 6.
+
+**Avancement réel au moment de l'interruption (nouvelle conversation
+à ouvrir pour la suite)** :
+- Prérequis (création tenant) : ✅ fait.
+- Correctif `is_synthetic` : ✅ fait.
+- Scénario 1 (micro-fractionnement) : SQL relancé après correctif,
+  **résultat non encore confirmé** — B4/B5 pas encore relancés sur
+  les bonnes données.
+- Scénarios 2, 3, 4, 6 : SQL rédigé, **pas encore exécutés**.
+- Scénario 5 (combinaison, alerte attendue) + parcours analyste
+  complet (dashboard → détail → graphe → fermeture B8 → audit) :
+  **pas encore exécuté**.
+- Nettoyage final du tenant : **pas encore fait**.
+
+Rien de tout ceci n'est encore validé par le fondateur — statut
+`EN COURS` explicite, à ne pas confondre avec une étape terminée.
 
 ## Règle
 

@@ -19,6 +19,7 @@ from uuid import UUID
 
 import asyncpg
 from brique_01_postgresql.connection import create_pool
+from brique_02_auth_rbac.session import AuthenticatedUser
 from brique_06_neo4j import requetes as requetes_graphe
 from brique_06_neo4j.connexion import create_driver
 from brique_06_neo4j.lecture import lire_comptes_alertes
@@ -26,6 +27,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 
 from brique_07_dashboard import lecture
+from brique_07_dashboard.auth_cookie import get_current_user_from_cookie
 from brique_07_dashboard.tenant_garde import MetadonneesTenant, tenant_valide
 from brique_07_dashboard.traductions import langue_pour_pays
 
@@ -35,14 +37,18 @@ router = APIRouter(tags=["alertes"])
 def construire_routes_alertes(templates: Jinja2Templates) -> APIRouter:
     @router.get("/alertes")
     async def liste_alertes(
-        request: Request, tenant: MetadonneesTenant = Depends(tenant_valide),  # noqa: B008
+        request: Request,
+        tenant: MetadonneesTenant = Depends(tenant_valide),  # noqa: B008
+        utilisateur: AuthenticatedUser = Depends(get_current_user_from_cookie),  # noqa: B008
     ) -> object:
         pool = await create_pool()
         alertes = await lecture.lister_alertes_ouvertes(pool, tenant.schema_name)
         langue = langue_pour_pays(tenant.country_code)
 
         return templates.TemplateResponse(
-            request, "alertes_liste.html", {"alertes": alertes, "langue": langue}
+            request,
+            "alertes_liste.html",
+            {"alertes": alertes, "langue": langue, "role": utilisateur.role},
         )
 
     @router.get("/alertes/{alerte_id}")
@@ -50,6 +56,7 @@ def construire_routes_alertes(templates: Jinja2Templates) -> APIRouter:
         request: Request,
         alerte_id: UUID,
         tenant: MetadonneesTenant = Depends(tenant_valide),  # noqa: B008
+        utilisateur: AuthenticatedUser = Depends(get_current_user_from_cookie),  # noqa: B008
     ) -> object:
         pool = await create_pool()
         alerte = await lecture.lire_alerte(pool, tenant.schema_name, alerte_id)
@@ -60,7 +67,9 @@ def construire_routes_alertes(templates: Jinja2Templates) -> APIRouter:
         langue = langue_pour_pays(tenant.country_code)
 
         return templates.TemplateResponse(
-            request, "alerte_detail.html", {"alerte": alerte, "langue": langue}
+            request,
+            "alerte_detail.html",
+            {"alerte": alerte, "langue": langue, "role": utilisateur.role},
         )
 
     @router.get("/alertes/{alerte_id}/graphe")

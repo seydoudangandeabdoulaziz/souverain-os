@@ -6,6 +6,19 @@
 # Ce fichier local est ignoré par Git (.gitignore).
 #
 # Brique 0 : aucun override nécessaire pour l'instant.
+#
+# Étape 4a : Prometheus et Grafana ne publient aucun port sur
+# l'hôte dans docker-compose.yml (décision actée — pas d'exposition
+# par défaut sur une plateforme de renseignement financier). Pour y
+# accéder ponctuellement depuis ton navigateur, décommenter ici :
+#
+# services:
+#   grafana:
+#     ports:
+#       - "3000:3000"
+#   prometheus:
+#     ports:
+#       - "9090:9090"
 # ============================================================
 
 services: {}

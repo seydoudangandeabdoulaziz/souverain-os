@@ -1,0 +1,297 @@
+/*
+ * SOUVERAIN-OS — socle CSS partagé (Phase transverse, Étape 3 — UX/UI).
+ *
+ * Servi à /static/souverain.css par le mount StaticFiles de la Brique 7
+ * (creer_application()) — présent sur l'instance FastAPI assemblée par
+ * souverain_app, donc automatiquement disponible pour la Brique 7, la
+ * Brique 8 (fragments injectés dans une page Brique 7) et la
+ * gouvernance V2 (Brique 2), sans mount supplémentaire ni dépendance
+ * Python d'une brique vers une autre.
+ *
+ * Reprend et généralise le CSS qui existait déjà en inline dans
+ * base.html et login.html (Brique 7) — pas une réinvention — et
+ * ajoute les classes réellement utilisées mais jamais définies avant
+ * cette étape : .succes, .audit-historique, .audit-commentaire
+ * (Brique 8), + de quoi habiller liste_utilisateurs.html (Brique 2 V2)
+ * qui n'avait aucun style du tout.
+ *
+ * Portée volontairement minimale (MVP fondations) : pas de responsive,
+ * pas d'audit d'accessibilité, pas de thème sombre — Vision, hors
+ * périmètre de cette étape.
+ */
+
+:root {
+    --couleur-primaire: #0b2545;
+    --couleur-fond: #f4f4f4;
+    --couleur-texte: #1a1a1a;
+    --couleur-texte-attenue: #777;
+    --couleur-bordure: #ddd;
+    --couleur-erreur: #b00020;
+    --couleur-succes: #1b7a3d;
+    --couleur-avertissement: #8a5a00;
+    --couleur-accent-claire: #e8edf4;
+    --rayon: 4px;
+    --espace-xs: 0.25rem;
+    --espace-sm: 0.5rem;
+    --espace-md: 1rem;
+    --espace-lg: 1.5rem;
+}
+
+body {
+    font-family: system-ui, sans-serif;
+    margin: 0;
+    color: var(--couleur-texte);
+}
+
+/* Échelle typographique — densité maîtrisée, pas les tailles par
+   défaut du navigateur. Cohérente entre B7 et B2 V2. */
+h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 var(--espace-md) 0;
+}
+h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: var(--espace-lg) 0 var(--espace-sm) 0;
+}
+h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: var(--espace-md) 0 var(--espace-xs) 0;
+}
+
+/* Navigation — partagée entre le dashboard (Brique 7) et la
+   gouvernance des utilisateurs (Brique 2 V2). Chaque brique garde son
+   propre balisage <nav> (dupliqué, pas hérité), seule cette classe
+   est commune. */
+nav {
+    background: var(--couleur-primaire);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--espace-md);
+}
+nav a,
+nav button {
+    color: white;
+    text-decoration: none;
+    background: none;
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+}
+nav a.actif {
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+.nav-droite {
+    display: flex;
+    align-items: center;
+    gap: var(--espace-md);
+}
+
+main {
+    padding: var(--espace-lg);
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+th,
+td {
+    text-align: left;
+    padding: var(--espace-sm);
+    border-bottom: 1px solid var(--couleur-bordure);
+}
+th {
+    background: var(--couleur-fond);
+}
+
+/* Badges — statut, rôle, score. Un badge = un état, jamais du texte
+   brut, pour que l'œil scanne vite un tableau dense (#6, #7). */
+.badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--rayon);
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: var(--couleur-fond);
+    color: var(--couleur-texte);
+}
+.badge-role {
+    background: var(--couleur-accent-claire);
+    color: var(--couleur-primaire);
+    text-transform: capitalize;
+}
+.badge-actif,
+.badge-statut-ouverte {
+    background: #e6f4ea;
+    color: var(--couleur-succes);
+}
+.badge-inactif,
+.badge-statut-fermee {
+    background: #f4e6e6;
+    color: var(--couleur-erreur);
+}
+.badge-score {
+    background: var(--couleur-accent-claire);
+    color: var(--couleur-primaire);
+    font-weight: 700;
+}
+
+/* Tags — un par pattern détecté, plutôt qu'une liste jointe par
+   virgules (#9). Neutres : ce ne sont pas des statuts, pas de couleur
+   sémantique ici — seulement les badges le sont. */
+.tag {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    margin: 0 var(--espace-xs) var(--espace-xs) 0;
+    border: 1px solid var(--couleur-bordure);
+    border-radius: var(--rayon);
+    font-size: 0.8rem;
+    color: var(--couleur-texte);
+}
+
+.vide {
+    color: var(--couleur-texte-attenue);
+    font-style: italic;
+}
+/* Message de contexte réel (ex. aucun cycle de scoring exécuté),
+   volontairement distinct de .vide — ce n'est pas juste "rien à
+   voir", c'est une information sur l'état du pipeline (#11). */
+.avertissement {
+    color: var(--couleur-avertissement);
+    background: #fdf3e0;
+    border-left: 3px solid var(--couleur-avertissement);
+    padding: var(--espace-sm) var(--espace-md);
+    margin: var(--espace-md) 0;
+    font-size: 0.9rem;
+}
+.chargement {
+    color: var(--couleur-texte-attenue);
+}
+.erreur,
+.succes {
+    font-size: 0.9rem;
+    margin-top: var(--espace-md);
+    padding-left: 1.4rem;
+    position: relative;
+}
+.erreur {
+    color: var(--couleur-erreur);
+}
+.succes {
+    color: var(--couleur-succes);
+}
+.erreur::before,
+.succes::before {
+    position: absolute;
+    left: 0;
+}
+.erreur::before {
+    content: "\26A0";
+}
+.succes::before {
+    content: "\2713";
+}
+
+/* Historique d'audit — fragment de fermeture d'alerte (Brique 8).
+   Classes référencées depuis la validation de la Brique 8 mais
+   jamais définies avant cette étape (rendu au style par défaut du
+   navigateur jusqu'ici). */
+.audit-historique {
+    list-style: none;
+    padding: 0;
+    margin-top: var(--espace-md);
+}
+.audit-historique li {
+    padding: var(--espace-sm) 0;
+    border-bottom: 1px solid var(--couleur-bordure);
+}
+.audit-commentaire {
+    display: block;
+    color: #555;
+    font-style: italic;
+    margin-top: var(--espace-xs);
+}
+
+/* Formulaires — login (Brique 7) et gouvernance des utilisateurs
+   (Brique 2 V2). */
+label {
+    display: block;
+    margin-top: var(--espace-md);
+    font-size: 0.9rem;
+}
+input,
+select,
+textarea {
+    width: 100%;
+    padding: var(--espace-sm);
+    margin-top: var(--espace-xs);
+    box-sizing: border-box;
+    font-family: inherit;
+}
+button {
+    cursor: pointer;
+}
+/* Hiérarchie d'actions — une action constructive (créer, fermer une
+   alerte) ne doit jamais avoir le même poids visuel qu'une action
+   sensible (désactiver un compte) (#5). Boutons de formulaire
+   uniquement — les liens/boutons de la nav gardent leur propre
+   style, déjà neutre par design. */
+.bouton-primaire,
+.bouton-secondaire,
+.bouton-danger {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: var(--rayon);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.bouton-primaire {
+    background: var(--couleur-primaire);
+    color: white;
+}
+.bouton-secondaire {
+    background: var(--couleur-fond);
+    color: var(--couleur-texte);
+    border: 1px solid var(--couleur-bordure);
+}
+.bouton-danger {
+    background: white;
+    color: var(--couleur-erreur);
+    border: 1px solid var(--couleur-erreur);
+}
+
+/* Page de connexion — hors layout nav/main, carte centrée. */
+.page-connexion {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: var(--couleur-fond);
+}
+.carte-connexion {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    width: 300px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+.carte-connexion button[type="submit"] {
+    margin-top: var(--espace-lg);
+    width: 100%;
+    padding: 0.6rem;
+    background: var(--couleur-primaire);
+    color: white;
+    border: none;
+    border-radius: var(--rayon);
+}

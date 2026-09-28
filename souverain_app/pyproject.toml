@@ -19,6 +19,7 @@ dependencies = [
     "brique-08-audit-human-loop",
     "fastapi>=0.115.0",
     "uvicorn>=0.30.0",
+    "prometheus-client>=0.21.0",
 ]
 
 [tool.uv.sources]
@@ -38,6 +39,16 @@ dev = [
 
 [tool.mypy]
 python_version = "3.12"
+
+[[tool.mypy.overrides]]
+# Même manque déjà documenté et contourné en Brique 7 : la Brique 2
+# n'a pas de py.typed. Jamais surfacé ici avant l'Étape 4a car
+# personne n'avait encore lancé `mypy src/` directement sur
+# souverain_app (seulement par brique jusqu'ici) — pas une régression
+# introduite par cette étape, un manque préexistant découvert en
+# vérifiant. Contournement local, aucune modification de la Brique 2.
+module = "brique_02_auth_rbac.*"
+ignore_missing_imports = true
 
 [build-system]
 requires = ["hatchling"]

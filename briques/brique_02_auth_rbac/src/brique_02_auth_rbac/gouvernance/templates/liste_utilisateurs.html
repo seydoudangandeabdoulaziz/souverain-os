@@ -3,8 +3,27 @@
 <head>
     <meta charset="utf-8">
     <title>{{ t('gouvernance.titre') }}</title>
+    <link rel="stylesheet" href="/static/souverain.css">
 </head>
 <body>
+    {# Nav dupliquée depuis base.html (Brique 7), pas héritée : un
+       {% extends %} croisé vers la Brique 7 introduirait une
+       dépendance Python de la Brique 2 vers la Brique 7, qui
+       inverserait le graphe de dépendances déjà acté (même principe
+       que la duplication du cookie de session et du CSRF à la
+       conception des extensions V2). Hrefs en dur, comme dans
+       base.html — seul le texte des liens passe par t(). #}
+    <nav>
+        <a href="/alertes">{{ t('gouvernance.nav_alertes') }}</a>
+        <a href="/utilisateurs" class="actif">{{ t('gouvernance.nav_utilisateurs') }}</a>
+        <div class="nav-droite">
+            <span class="badge badge-role">{{ role }}</span>
+            <form action="/logout" method="post" style="margin:0">
+                <button type="submit">{{ t('gouvernance.nav_deconnexion') }}</button>
+            </form>
+        </div>
+    </nav>
+    <main>
     <h1>{{ t('gouvernance.titre') }}</h1>
 
     {% if erreur %}
@@ -28,7 +47,7 @@
                 <option value="auditor">{{ t('gouvernance.role_auditor') }}</option>
             </select>
 
-            <button type="submit">{{ t('gouvernance.bouton_creer') }}</button>
+            <button type="submit" class="bouton-primaire">{{ t('gouvernance.bouton_creer') }}</button>
         </form>
     </section>
 
@@ -49,11 +68,12 @@
                     <td>{{ u.email }}</td>
                     <td>
                         {% if u.user_id == utilisateur_courant_id %}
-                            {{ u.role }} {{ t('gouvernance.action_soi_meme') }}
+                            <span class="badge badge-role">{{ u.role }}</span> {{ t('gouvernance.action_soi_meme') }}
                         {% else %}
                         <form method="post" action="/utilisateurs/{{ u.user_id }}/role" style="display:inline">
                             <input type="hidden" name="jeton_csrf" value="{{ jeton_csrf }}">
-                            <select name="role" onchange="this.form.requestSubmit()">
+                            <select name="role" data-role-actuel="{{ u.role }}"
+                                    onchange="if (confirm('{{ t('gouvernance.confirmation_changement_role') }}')) { this.form.requestSubmit(); } else { this.value = this.dataset.roleActuel; }">
                                 <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>{{ t('gouvernance.role_admin') }}</option>
                                 <option value="analyst" {% if u.role == 'analyst' %}selected{% endif %}>{{ t('gouvernance.role_analyst') }}</option>
                                 <option value="auditor" {% if u.role == 'auditor' %}selected{% endif %}>{{ t('gouvernance.role_auditor') }}</option>
@@ -61,18 +81,18 @@
                         </form>
                         {% endif %}
                     </td>
-                    <td>{{ t('gouvernance.statut_actif') if u.is_active else t('gouvernance.statut_desactive') }}</td>
+                    <td><span class="badge {{ 'badge-actif' if u.is_active else 'badge-inactif' }}">{{ t('gouvernance.statut_actif') if u.is_active else t('gouvernance.statut_desactive') }}</span></td>
                     <td>
                         {% if u.user_id != utilisateur_courant_id %}
                             {% if u.is_active %}
                             <form method="post" action="/utilisateurs/{{ u.user_id }}/desactivation">
                                 <input type="hidden" name="jeton_csrf" value="{{ jeton_csrf }}">
-                                <button type="submit">{{ t('gouvernance.action_desactiver') }}</button>
+                                <button type="submit" class="bouton-danger">{{ t('gouvernance.action_desactiver') }}</button>
                             </form>
                             {% else %}
                             <form method="post" action="/utilisateurs/{{ u.user_id }}/reactivation">
                                 <input type="hidden" name="jeton_csrf" value="{{ jeton_csrf }}">
-                                <button type="submit">{{ t('gouvernance.action_reactiver') }}</button>
+                                <button type="submit" class="bouton-secondaire">{{ t('gouvernance.action_reactiver') }}</button>
                             </form>
                             {% endif %}
                         {% endif %}
@@ -86,22 +106,23 @@
     <section>
         <h2>{{ t('gouvernance.historique_titre') }}</h2>
         {% if historique %}
-        <ul>
+        <ul class="audit-historique">
             {% for entree in historique %}
             <li>
                 <strong>{{ entree.action }}</strong>
                 &mdash; {{ entree.created_at.strftime('%Y-%m-%d %H:%M') }}
                 {% if entree.acteur_type == 'utilisateur_authentifie' %}
-                    (utilisateur {{ entree.acteur_user_id }})
+                    <span class="audit-commentaire">{{ t('gouvernance.historique_acteur_web') }} : {{ entree.acteur_user_id }}</span>
                 {% else %}
-                    (déclaré, non authentifié : {{ entree.acteur_declare }})
+                    <span class="audit-commentaire">{{ t('gouvernance.historique_acteur_cli') }} : {{ entree.acteur_declare }}</span>
                 {% endif %}
             </li>
             {% endfor %}
         </ul>
         {% else %}
-        <p>{{ t('gouvernance.historique_vide') }}</p>
+        <p class="vide">{{ t('gouvernance.historique_vide') }}</p>
         {% endif %}
     </section>
+    </main>
 </body>
 </html>

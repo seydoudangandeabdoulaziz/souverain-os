@@ -17,9 +17,9 @@
         {% for alerte in alertes %}
         <tr>
             <td><a href="/alertes/{{ alerte.alerte_id }}">{{ alerte.compte_pivot }}</a></td>
-            <td class="score">{{ alerte.score }}</td>
-            <td>{{ alerte.statut }}</td>
-            <td>{{ alerte.pattern_types_impliques|join(', ') }}</td>
+            <td><span class="badge badge-score">{{ alerte.score }}</span></td>
+            <td><span class="badge badge-statut-{{ alerte.statut }}">{{ alerte.statut }}</span></td>
+            <td>{% for pattern in alerte.pattern_types_impliques %}<span class="tag">{{ pattern }}</span>{% endfor %}</td>
             <td>{{ alerte.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
         </tr>
         {% endfor %}

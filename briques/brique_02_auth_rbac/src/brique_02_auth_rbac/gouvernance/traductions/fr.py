@@ -6,6 +6,14 @@ aux clés d'une autre brique déjà validée."""
 from __future__ import annotations
 
 TEXTES_FR: dict[str, str] = {
+    "gouvernance.confirmation_changement_role": (
+        "Confirmer le changement de rôle de cet utilisateur ?"
+    ),
+    "gouvernance.historique_acteur_web": "par l'utilisateur",
+    "gouvernance.historique_acteur_cli": "par un opérateur CLI (non authentifié)",
+    "gouvernance.nav_alertes": "Alertes",
+    "gouvernance.nav_utilisateurs": "Utilisateurs",
+    "gouvernance.nav_deconnexion": "Déconnexion",
     "gouvernance.titre": "Gestion des utilisateurs",
     "gouvernance.creer_titre": "Créer un utilisateur",
     "gouvernance.email": "Email",

@@ -66,6 +66,7 @@ def construire_routes_gouvernance() -> APIRouter:
                 "utilisateurs": utilisateurs,
                 "historique": historique,
                 "utilisateur_courant_id": utilisateur.user_id,
+                "role": utilisateur.role,
                 "jeton_csrf": jeton_csrf,
                 "erreur": erreur,
             },

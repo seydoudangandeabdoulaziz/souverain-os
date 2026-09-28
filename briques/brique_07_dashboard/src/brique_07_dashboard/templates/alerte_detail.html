@@ -3,11 +3,15 @@
 <p><a href="/alertes">&larr; {{ t('alerte_detail.retour', langue) }}</a></p>
 <h1>{{ t('alerte_detail.titre', langue) }} — {{ alerte.compte_pivot }}</h1>
 
+<p class="avertissement">{{ t('alerte_detail.avertissement_score', langue) }}</p>
+
 <p>
-    <strong>{{ t('alerte_detail.score', langue) }} :</strong> {{ alerte.score }}<br>
-    <strong>{{ t('alerte_detail.statut', langue) }} :</strong> {{ alerte.statut }}<br>
+    <strong>{{ t('alerte_detail.score', langue) }} :</strong>
+        <span class="badge badge-score">{{ alerte.score }}</span><br>
+    <strong>{{ t('alerte_detail.statut', langue) }} :</strong>
+        <span class="badge badge-statut-{{ alerte.statut }}">{{ alerte.statut }}</span><br>
     <strong>{{ t('alerte_detail.patterns', langue) }} :</strong>
-        {{ alerte.pattern_types_impliques|join(', ') }}<br>
+        {% for pattern in alerte.pattern_types_impliques %}<span class="tag">{{ pattern }}</span>{% endfor %}<br>
     <strong>{{ t('alerte_detail.fenetre', langue) }} :</strong>
         {{ alerte.fenetre_debut.strftime('%Y-%m-%d') }} &rarr;
         {{ alerte.fenetre_fin.strftime('%Y-%m-%d') }}

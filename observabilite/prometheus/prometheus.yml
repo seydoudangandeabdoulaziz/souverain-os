@@ -1,0 +1,32 @@
+# ============================================================
+# SOUVERAIN-OS — Configuration Prometheus (Étapes 4a + 4b)
+# ============================================================
+# 4a : FastAPI (souverain_app, sur l'hôte).
+# 4b : PostgreSQL, via postgres-exporter (rôle souverain_monitoring,
+# pg_monitor uniquement — voir migration 0005, Brique 1).
+#
+# Neo4j retiré du périmètre — confirmé sur la machine réelle du
+# fondateur (Neo4j 5.26.30 Community) via
+# `CALL dbms.listConfig() YIELD name WHERE name CONTAINS 'prometheus'`
+# (résultat vide) : aucun réglage Prometheus n'est déclaré dans cette
+# édition, malgré une documentation générale qui ne distingue pas
+# clairement Community/Enterprise sur ce point.
+# ============================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "souverain_app"
+    # souverain_app tourne en natif sur l'hôte (uv run souverain-app),
+    # jamais en conteneur — voir extra_hosts sur le service prometheus
+    # dans docker-compose.yml (nécessaire sous Linux).
+    static_configs:
+      - targets: ["host.docker.internal:8080"]
+
+  - job_name: "postgres"
+    # postgres-exporter (Étape 4b) — même réseau Docker que Prometheus,
+    # résolution par nom de service, pas d'extra_hosts nécessaire ici.
+    static_configs:
+      - targets: ["postgres-exporter:9187"]

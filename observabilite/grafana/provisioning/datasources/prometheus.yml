@@ -1,0 +1,18 @@
+# ============================================================
+# SOUVERAIN-OS — Provisioning Grafana : source de données (Étape 4a)
+# ============================================================
+# Déclare Prometheus comme unique source au démarrage — pas de clic
+# manuel. Aucun dashboard pré-construit en MVP (décision actée,
+# éviter d'imposer une vision de dashboard non validée par le
+# fondateur) : ce fichier est volontairement le seul du provisioning.
+# ============================================================
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

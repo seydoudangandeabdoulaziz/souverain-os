@@ -39,3 +39,10 @@ data/synthetic/*.json
 
 # OS
 .DS_Store
+
+# Artefacts locaux de test de charge (Étape 5) — jamais à committer
+log_b3_palier_*.txt
+log_b4_palier_*.txt
+log_b5_palier_*.txt
+log_b6_palier_*.txt
+mesures_palier_*.log
