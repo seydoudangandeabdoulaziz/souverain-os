@@ -23,7 +23,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-souverain_admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -61,8 +61,8 @@ services:
       # ses autres exports natifs (CSV, JMX) si un besoin réel se
       # présente — hors périmètre 4a, FUTUR si nécessaire.
     ports:
-      - "${NEO4J_HTTP_PORT:-7474}:7474"
-      - "${NEO4J_BOLT_PORT:-7687}:7687"
+      - "127.0.0.1:${NEO4J_HTTP_PORT:-7474}:7474"
+      - "127.0.0.1:${NEO4J_BOLT_PORT:-7687}:7687"
     volumes:
       - neo4j_data:/data
     healthcheck:
@@ -153,11 +153,33 @@ services:
     networks:
       - souverain-net
 
+  # --- Étape 6 (Ollama — assistance IA locale) ---
+  ollama:
+    # Image figée par digest (Ollama 0.35.1, version testée en Étape 6a).
+    image: ollama/ollama@sha256:292ee7945dfc3d5840a181f3ab86fedb1e66703e02c8af98b50f4da56b7e278c
+    profiles: ["ollama"]
+    ports:
+      - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
+    environment:
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - souverain-net
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
 volumes:
   postgres_data:
   neo4j_data:
   prometheus_data:
   grafana_data:
+  ollama_data:
 
 networks:
   souverain-net:
