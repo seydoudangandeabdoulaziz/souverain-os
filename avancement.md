@@ -44,7 +44,7 @@ VALIDÉE
 | 3 | UX/UI (fondations) | **VALIDÉE** |
 | 4 | Prometheus/Grafana | **VALIDÉE** (4a + 4b) |
 | 5 | Test de charge du pipeline actuel | **VALIDÉE** |
-| 6 | Ollama/Mistral | NON COMMENCÉE |
+| 6 | Ollama/Mistral (→ Ministral 3 8B, voir détail) | 6a EN ANALYSE / TESTÉE, 6b NON COMMENCÉE |
 | 7 | Sécurité IA/RAG (conception) | NON COMMENCÉE |
 | 8 | RAG | NON COMMENCÉE |
 | 9 | Redis/Celery (conditionnel à l'étape 5) | NON COMMENCÉE |
@@ -1024,95 +1024,139 @@ schéma était déjà vide après les `TRUNCATE` de fin de campagne).
 
 **Prête pour l'analyse de l'Étape 6 (Ollama/Mistral) dès demande explicite du fondateur**, conformément à l'ordre validé — sauf si le fondateur préfère d'abord ouvrir le cycle de conception UX/UI approfondi resté en attente depuis l'Étape 3, ou traiter le point de vigilance Neo4j (plafond mémoire) avant d'aller plus loin.
 
-## EN COURS — Campagne fonctionnelle (parcours analyste, 6 scénarios de fraude synthétique)
+## Vérification manuelle ponctuelle — parcours analyste complet (29-30 septembre 2026)
 
-**Statut : EN COURS, non validée — décidée après l'Étape 5, avant l'Étape 6.**
+**Contexte** : avant de commencer l'Étape 6 (Ollama/Mistral), vérification
+empirique ciblée du parcours humain complet avec une vraie alerte produite
+par le pipeline (jamais observé auparavant — Étape 5 n'avait produit aucune
+alerte réelle). Tenant temporaire dédié `tenant_verif_b8`
+(`tenant_id=b1e689f8-de34-4cdd-ac21-7e408fa83845`), un seul scénario
+combiné (structure_etoile + micro_fractionnement + transactions_nocturnes,
+score 60), jamais mélangé à `tenant_ne` ni aux autres tenants.
 
-Décision du fondateur : l'Étape 5 a démontré la capacité de charge
-(jusqu'à 50 000 transactions) mais pas le parcours utilisateur réel
-(0 alerte générée à chaque palier, cohérent avec la limite déjà
-actée du générateur B3). Cette campagne comble ce manque avant
-d'aborder l'UX/UI approfondi ou l'Étape 6 (Ollama/Mistral), pour ne
-pas laisser une future couche explicative masquer des lacunes
-fonctionnelles non vérifiées du cœur du système.
+**Résultat principal** : pipeline B3→B4→B5→B6→B7→B8 confirmé fonctionnel
+de bout en bout en conditions réelles — 3 détections, 1 alerte réelle
+créée (score 60), dashboard affichant correctement score/statut/motifs,
+fermeture réelle effectuée (`en_cours_investigation`), entrée d'audit
+visible avec email résolu, RBAC confirmé (`analyst` voit et utilise le
+formulaire, `auditor` ne le voit pas).
 
-Principe : **aucune modification de B4/B5/B6**. Les transactions de
-test sont insérées directement en SQL (le générateur B3 ne peut pas
-produire de comptes multi-patterns, limite déjà documentée) pour
-déclencher les règles de détection déjà implémentées, jamais pour
-fabriquer artificiellement un résultat.
+**Bug réel trouvé et corrigé ponctuellement pour ce test** : la migration
+`0001_create_audit_log_table.sql` (Brique 8) ne crée `{tenant}.audit_log`
+et ses privilèges (`souverain_brique8_audit`) que pour les tenants déjà
+enregistrés **au moment de son exécution**. Un tenant créé après coup
+(comme `tenant_verif_b8`) n'a ni la table ni les privilèges. La logique
+de réparation documentée dans `persistence.py` ne s'exécute qu'au moment
+d'une **écriture** (fermeture d'alerte) — jamais au moment de la
+**lecture** de l'historique (`GET /alertes/{id}/fermeture`, appelée par
+tous les rôles pour afficher le fragment). Conséquence réelle observée :
+`500 Internal Server Error` (`InsufficientPrivilegeError`, puis
+`relation does not exist` une fois le GRANT ajouté manuellement) au
+premier chargement de la page de détail d'une alerte — **avant** toute
+tentative de fermeture, pour n'importe quel rôle, y compris `auditor`
+qui ne peut jamais fermer d'alerte.
 
-Isolation : tenant dédié `tenant_test_fonctionnel`
-(`tenant_id=916da41b-9b5b-44ea-8a95-2b92ac42592b`), créé le 20
-septembre 2026, jamais mélangé à `tenant_ne` ni à
-`tenant_test_charge` (déjà nettoyé, Étape 5).
+Contourné manuellement pour ce test (table créée, GRANT ajoutés à la
+main, identiques à ceux de la migration) — **aucune modification de
+code de la Brique 8**. Le bug de fond reste réel et non corrigé : tout
+nouveau tenant créé en production (Phase 2, premier export UEMOA)
+rencontrera ce même 500 au premier chargement d'une page de détail
+d'alerte. À corriger par décision explicite séparée — probablement :
+étendre la réparation déjà existante de `persistence.py` au chemin de
+lecture (`lecture.py`), ou la déclencher dans `tenant_valide()`.
 
-**6 scénarios conçus et validés par le fondateur, SQL complet
-rédigé** :
+**Limite assumée de ce test** : scénario volontairement minimal (étoile
+pure, un seul compte alerté) — les 3 requêtes du fragment graphe
+(Brique 6) retournent "Aucun résultat" par construction (pas de
+redistribution multi-sauts, pas de second compte alerté à relier).
+Le rendu d'un graphe réellement peuplé reste à vérifier lors de la
+campagne fonctionnelle finale.
 
-| # | Pattern | Poids | Score attendu | Alerte attendue |
-|---|---|---|---|---|
-| 1 | micro_fractionnement | 20 | 20 | Non |
-| 2 | transactions_nocturnes | 15 | 15 | Non |
-| 3 | structure_etoile | 25 | 25 | Non |
-| 4 | flux_frontalier | 10 | 10 | Non |
-| 5 | étoile + fractionnement + nocturne | 60 | 60 | **Oui** |
-| 6 | compte_pivot | 30 | 30 | Non |
+Nettoyage : tenant temporaire, ses 3 utilisateurs de test et toutes ses
+données supprimés après vérification complète.
 
-Date de référence unique : `2026-09-20`, horodatages exprimés avec
-offset Niger explicite (`+01`), choisis loin des frontières 22h/4h
-(voir point technique ci-dessous).
+## Détail — Étape 6a (faisabilité du modèle LLM local)
 
-**Point technique vérifié et documenté (pas corrigé — hors
-périmètre B4)** : `asyncpg` décode les colonnes `TIMESTAMPTZ` via le
-protocole binaire comme un instant absolu, toujours retourné en
-`datetime` UTC-aware, indépendamment du fuseau de session
-PostgreSQL. La règle `transactions_nocturnes`
-(`brique_04_detection/regles/nocturne.py`) lit `.hour` en supposant
-implicitement (docstring) que c'est déjà l'heure locale Niger — ce
-n'est vrai qu'au milieu de la fenêtre, pas à ses bornes exactes
-(22h00-22h59 et 03h00-03h59 Niger local sont mal classés par un
-décalage silencieux de -1h). **Bug de bord latent, jamais visible
-jusqu'ici** (le générateur B3 ne tape jamais exactement sur cette
-frontière). Contournement pour cette campagne : tous les horaires
-nocturnes choisis à 23h00-23h45, largement à l'intérieur de la
-fenêtre — aucune modification de B4. À traiter par décision
-explicite séparée si le fondateur le souhaite un jour.
+**Statut : EN ANALYSE / TESTÉE — faisabilité confirmée le 7 octobre
+2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1
+Carbon Gen 6. Intégration (6b) non commencée.**
 
-**Bug réel rencontré et corrigé pendant l'exécution (pas dans le
-SQL initial — dans l'ordre des opérations)** : sur un tenant neuf,
-la colonne `is_synthetic` de `{tenant}.transactions` n'existe pas
-tant que le générateur B3 n'a jamais tourné dessus — elle est
-ajoutée par une logique d'auto-réparation **dans B3 lui-même**
-(`ingestion.py`, idempotente), pas par le schéma de base provisionné
-à la création du tenant. Comme les scénarios contournent
-volontairement B3 (INSERT SQL direct), cette auto-réparation n'a
-jamais eu l'occasion de s'exécuter. Corrigé par l'exécution manuelle
-de l'instruction idempotente déjà écrite dans B3 (pas une
-modification de B3, une application ponctuelle de son propre
-correctif documenté) :
-```sql
-ALTER TABLE tenant_test_fonctionnel.transactions
-ADD COLUMN IF NOT EXISTS is_synthetic BOOLEAN NOT NULL DEFAULT false;
-```
-Cette colonne existe désormais sur `tenant_test_fonctionnel` — pas
-besoin de rejouer ce correctif pour les scénarios 2 à 6.
+Décision de direction actée avant tout test (28 septembre 2026) : pas
+de benchmark comparatif multi-modèles — test de faisabilité ciblé sur
+un candidat unique, choisi après vérification que Mistral 7B v0.3 est
+présenté par son éditeur comme retiré des nouvelles intégrations
+recommandées, au profit de Ministral 3. Ministral 3 3B envisagé
+uniquement comme secours en cas d'échec matériel mesuré — non
+nécessaire, le candidat principal ayant passé le test.
 
-**Avancement réel au moment de l'interruption (nouvelle conversation
-à ouvrir pour la suite)** :
-- Prérequis (création tenant) : ✅ fait.
-- Correctif `is_synthetic` : ✅ fait.
-- Scénario 1 (micro-fractionnement) : SQL relancé après correctif,
-  **résultat non encore confirmé** — B4/B5 pas encore relancés sur
-  les bonnes données.
-- Scénarios 2, 3, 4, 6 : SQL rédigé, **pas encore exécutés**.
-- Scénario 5 (combinaison, alerte attendue) + parcours analyste
-  complet (dashboard → détail → graphe → fermeture B8 → audit) :
-  **pas encore exécuté**.
-- Nettoyage final du tenant : **pas encore fait**.
+**Modèle retenu et testé** : Ministral 3 8B Instruct, quantification
+Q4_K_M (tag Ollama `ministral-3:8b-instruct-2512-q4_K_M`, digest
+`1922accd5827`, 6,0 Go, licence Apache 2.0 vérifiée directement depuis
+le modèle installé). Détail complet du protocole, des 10 fiches de
+test et de la grille PASS/FAIL dans `VERDICT_ETAPE_6A.md` et l'ADR
+correspondant (`docs/adr/ADR-004-changement-modele-llm.md`) —
+non résumés intégralement ici.
 
-Rien de tout ceci n'est encore validé par le fondateur — statut
-`EN COURS` explicite, à ne pas confondre avec une étape terminée.
+**Incident réel rencontré et contourné, non résolu avec certitude** :
+le protocole initial prévoyait Ollama en conteneur Docker
+(`souverain-bench-ollama`), cohérent avec le reste de l'architecture
+du projet. Tout conteneur Docker sur la machine de développement,
+sans exception (vérifié avec un conteneur `curl` neuf et sans lien
+avec Ollama), s'est révélé incapable de faire sortir le moindre
+trafic vers internet — diagnostic approfondi (DNS, règles `ufw`,
+NAT/`MASQUERADE`, `ip_forward`, `DOCKER-USER`/`FORWARD`, capture
+`tcpdump`) sans cause unique confirmée avec certitude ; la capture
+`tcpdump` a montré le paquet retour bien reçu par la machine
+(`wlp2s0 In`) mais rejeté par une erreur `ICMP time exceeded
+in-transit`, évoquant un problème de suivi de connexion (`conntrack`)
+plutôt qu'un simple blocage de pare-feu. **Contourné par une
+installation native d'Ollama** (`curl -fsSL https://ollama.com/
+install.sh | sh`, service `systemd`), qui n'a rencontré aucun
+problème réseau. Décision de revenir ou non à une exécution
+conteneurisée pour l'Étape 6b **non tranchée**, à décider
+explicitement avant l'intégration.
+
+**Résultats** : critères PASS, avec deux réserves documentées —
+RAM mesurée à 6,53 GiB contre un seuil fixé à 6,5 Go (écart de
+0,46 %, accepté avec réserve, seuil non modifié rétroactivement) ;
+une confusion récurrente entre le poids d'un pattern de détection et
+un nombre de transactions ou d'occurrences, présente sur **4 fiches
+sur 10** (F03, F05, F07, F08). **Correction du 13 octobre 2026** : elle
+avait d'abord été documentée comme un cas unique (F05) ; la relecture
+des sorties a montré qu'elle touchait 4 fiches dès la série native.
+Un test complémentaire avec des faits étiquetés explicitement (4
+fiches, un passage) ne la reproduit pas, ce qui indique qu'elle vient
+largement de la présentation de nos fiches de test ; de petites
+imprécisions persistent (unités, « même opération »). La décision du
+7 octobre (« risque connu, non bloquant ») reposait sur le seul cas
+F05 et est à reconfirmer par le fondateur. L'invariant déjà acté
+(aucun chiffre produit par l'IA n'est une source de vérité autonome)
+est renforcé. Fonctionnement sans connexion réseau confirmé
+manuellement par le fondateur (WiFi physiquement coupé, génération
+réussie).
+
+**Étape 6a close. Prête pour l'analyse de l'Étape 6b (intégration)
+dès demande explicite du fondateur**, sous réserve de trancher au
+préalable la question de l'exécution native vs conteneurisée du
+service Ollama.
+
+## Campagne fonctionnelle (parcours analyste, 6 scénarios de fraude synthétique)
+
+**Statut : ABANDONNÉE le 28 septembre 2026, par décision explicite du
+fondateur (Seydou Dangande Abdoul Aziz).**
+
+Cette tentative de campagne (tenant `tenant_test_fonctionnel`,
+`tenant_id=916da41b-9b5b-44ea-8a95-2b92ac42592b`), restée bloquée à
+mi-parcours (scénario 1 jamais confirmé, scénarios 2 à 6 jamais
+exécutés — voir historique ci-dessus), est abandonnée sans reprise.
+Tenant, registre et schéma physique supprimés. Aucune donnée réelle
+perdue : la table `transactions` de ce tenant était déjà vide au
+moment de la décision.
+
+Une campagne fonctionnelle finale, plus complète, sera conçue après
+la finalisation du projet — couvrant ingestion, détection, scoring,
+graphe, alertes, investigation, audit/HITL et assistance IA locale.
+Non planifiée à ce jour dans l'ordre numéroté.
 
 ## Règle
 
