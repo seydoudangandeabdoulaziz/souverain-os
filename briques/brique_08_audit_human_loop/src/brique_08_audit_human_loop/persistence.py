@@ -291,15 +291,22 @@ async def fermer_alerte_avec_audit(
 
         # UN SEUL nouvel essai (autre rôle, autre connexion, hors verrou — la
         # réparation est déjà validée et idempotente). Un second échec remonte.
-        await _tenter_fermeture(
-            pool_audit,
-            nom_schema_tenant,
-            alerte_id=alerte_id,
-            tenant_id=tenant_id,
-            user_id=user_id,
-            motif=motif,
-            commentaire=commentaire,
-            audit_id=audit_id,
-        )
+        try:
+            await _tenter_fermeture(
+                pool_audit,
+                nom_schema_tenant,
+                alerte_id=alerte_id,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                motif=motif,
+                commentaire=commentaire,
+                audit_id=audit_id,
+            )
+        except asyncpg.exceptions.UndefinedTableError as exc_apres:
+            # audit_log vient d'être garantie par provisionner_audit() : la
+            # table absente ne peut plus être que `alertes` (la Brique 5 n'a
+            # jamais tourné pour ce tenant) — l'alerte est introuvable, pas
+            # une panne (409, pas 500).
+            raise AlerteNonFermable(alerte_id) from exc_apres
 
     return ResultatFermeture(alerte_id=alerte_id, audit_id=audit_id)
