@@ -1158,6 +1158,32 @@ la finalisation du projet — couvrant ingestion, détection, scoring,
 graphe, alertes, investigation, audit/HITL et assistance IA locale.
 Non planifiée à ce jour dans l'ordre numéroté.
 
+## Correction post-validation — Brique 8 : provisionnement de l'audit (17 octobre 2026)
+
+**Statut : EN VALIDATION — implémentée, 42/42 tests B8 et 203/203 tests du workspace verts sur la machine du fondateur (ThinkPad X1 Carbon Gen 6, PostgreSQL/TimescaleDB et Neo4j réels). La Brique 8 reste VALIDÉE (4 septembre 2026) ; cette correction attend sa validation explicite.**
+
+Défaut (relevé le 29-30 septembre) : sur un tenant créé après la migration B8, la page de détail d'une alerte renvoyait un HTTP 500. **Cause confirmée sur la pile réelle** : `create_tenant()` ne provisionne rien pour le rôle `souverain_brique8_audit` (ni `USAGE` sur le schéma, ni `audit_log`) ; PostgreSQL lève `InsufficientPrivilegeError` (42501), que ni la lecture ni l'écriture n'interceptaient (seul 42P01 l'était). La fixture de test accordait `USAGE` à la main, ce qui masquait le défaut.
+
+Décision : ADR-005 (provisionnement par commande explicite, réparation défensive à l'écriture, lecture sans DDL). Statut de l'ADR : Proposed, critères techniques remplis, en attente de validation.
+
+Livré (Brique 8 uniquement ; migration `0001`, B1, B2, B7, CSRF et RBAC inchangés) :
+- `diagnostic.py` : diagnostic en lecture seule (transaction `READ ONLY`), seul accès du chemin de lecture au pool admin.
+- `persistence.py` : `provisionner_audit()` (idempotent, verrou advisory par schéma, contrôle final : jamais `UPDATE`/`DELETE` sur `audit_log`) ; réparation à l'écriture selon la cause constatée, un seul nouvel essai.
+- `lecture.py`, `routes.py`, `modeles.py` : `AuditNonProvisionne` → HTTP 503 générique ; `[]` seulement si `audit_log` est légitimement absente.
+- `cli.py` : `uv run souverain-audit-provisionner --tenant … | --tous` (codes de sortie 0 à 3).
+- Tests : `test_tenant_neuf.py` (R1 à R5 de régression, A/D/C d'acceptation, H5/H7), `test_diagnostic.py`, `test_garanties_statiques.py`.
+
+Défaut propre au correctif, trouvé avant validation : sur un tenant neuf sans table `alertes`, la fermeture réparait l'audit puis remontait une erreur brute (500) au lieu d'`AlerteNonFermable` (409). Corrigé et couvert par le test A5.
+
+Constaté sur la base réelle : `souverain-audit-provisionner --tous` a réparé `tenant_sn_test` (`audit_log`, `usage_schema`, `audit_log_privileges`) ; `tenant_ne` était déjà conforme ; deuxième exécution : 2 conformes, code 0. `INSERT`/`SELECT` accordés, `UPDATE`/`DELETE`/`TRUNCATE` refusés sur `tenant_sn_test.audit_log`.
+
+Limites et points non traités (signalés, pas oubliés) :
+- Procédure de reproduction : le tenant de test `tenant_repro_b8` (code `ZZ`) est entré en collision avec les constantes de `test_tenant_governance.py` ; ligne de registre retirée, suite repassée au vert.
+- Affichage : avec HTMX, le 503 du fragment d'historique n'est pas inséré dans la page (comportement par défaut pour les 5xx) ; correction côté Brique 7, non faite.
+- Migration `0001` de B8 : son `GRANT … ON alertes` n'est pas gardé et pourrait échouer pour un tenant sans table `alertes`. Défaut suspecté (lu dans le SQL), **non reproduit, non évalué**, non corrigé ; à traiter séparément par une migration corrective distincte.
+- `create_tenant()` n'appelle pas le provisionnement de B8 : l'étape reste manuelle (automatisation à réexaminer en Phase 2).
+- Traçabilité de la commande dans une table d'audit : non faite (le pool admin n'est pas le rôle de gouvernance).
+
 ## Règle
 
 Ne pas marquer une brique comme terminée uniquement parce que son code existe. La validation doit inclure tests, vérification manuelle et validation explicite du fondateur.

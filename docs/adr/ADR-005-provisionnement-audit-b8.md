@@ -1,8 +1,9 @@
 # ADR-005 — Provisionnement de l'audit B8 par commande explicite
 
-**Statut : Proposée (Proposed) — brouillon v3.** Le statut ne passe à
-« Acceptée » qu'une fois les hypothèses techniques H1 à H7 confirmées
-par les tests de caractérisation (voir « Critère de passage »).
+**Statut : Proposée (Proposed) — critères techniques remplis le 17 octobre
+2026 ; passe à « Acceptée » sur validation explicite du fondateur.**
+Implémentation validée par 203/203 tests sur la machine du fondateur
+(voir « Critère de passage » et « Annexe »).
 **Date : 17 octobre 2026**
 **Décideur : Seydou Dangande Abdoul Aziz (fondateur)**
 
@@ -468,14 +469,16 @@ l'acceptation par un diagnostic simulé.
 - Le commentaire obsolète de `tenant_provisioning.py` (« appartient à
   la Brique 8 ») : signalé, non corrigé ici.
 
-## Critère de passage à « Acceptée »
+## Critère de passage à « Acceptée » (état au 17 octobre 2026)
 
-1. Les tests de caractérisation C-P1 à C-TXN sont exécutés sur la
-   machine du fondateur et H1 à H7 sont toutes confirmées.
-2. Les résultats sont consignés dans l'annexe ci-dessous (classe,
-   SQLSTATE, champs, `lc_messages`).
-3. Le fondateur valide le contenu final. Si une hypothèse est
-   réfutée, D1 à D4 sont révisés et l'ADR reste « Proposée ».
+1. **Hypothèses H1 à H7 confirmées** : oui, voir l'annexe. Écart de
+   méthode assumé : le fichier `test_caracterisation_provisioning.py`
+   prévu plus haut n'a **pas** été écrit. La confirmation s'est faite par
+   un script ponctuel sur la pile réelle (H1, H2), un PostgreSQL 16 de
+   test (H3 à H7) et les tests d'acceptation permanents de
+   `test_tenant_neuf.py` (dont `test_h5_*` et `test_h7_*`).
+2. **Résultats consignés** : oui, annexe ci-dessous.
+3. **Validation du fondateur** : en attente.
 
 ## Points ouverts
 
@@ -485,17 +488,17 @@ l'acceptation par un diagnostic simulé.
   15 s pour la réparation et 2 s pour le diagnostic) : à ajuster selon
   les mesures.
 
-## Annexe — Résultats de caractérisation (à compléter)
+## Annexe — Confirmation des hypothèses
 
-| Test | Classe | SQLSTATE | Champs structurés | Conforme à l'hypothèse ? |
-|---|---|---|---|---|
-| C-P1 | | | | |
-| C-P2 | | | | |
-| C-P3 | | | | |
-| C-A | | | | |
-| C-L | | | | |
-| C-RO | | | | |
-| C-LOCK | | | | |
-| C-TXN | | | | |
+| # | Vérifiée par | Résultat |
+|---|---|---|
+| H1 | Script de reproduction sur la pile réelle (TimescaleDB 2.17.2 / PG 16, vrai code B8) ; tests R1 et R3 | `InsufficientPrivilegeError`, SQLSTATE 42501, avant toute vérification d'existence ✔ |
+| H2 | Même script ; PostgreSQL 16.15 de test pour 42P01 | `schema_name`, `table_name`, `column_name`, `constraint_name` tous `None` ✔ |
+| H3 | PostgreSQL 16.15 de test ; tests A5, D1, D2 sur la pile réelle | `audit_log` absente et `alertes` absente : même classe, même SQLSTATE 42P01, champs vides ; la distinction passe par le catalogue ✔ |
+| H4 | PostgreSQL 16.15 de test (états S1 et S3) ; tests R5 et D3 sur la pile réelle | Privilège de schéma ou de table manquant : même classe 42501 ✔ |
+| H5 | PostgreSQL 16.15 de test ; `test_h5_*` | `GRANT` et `CREATE TABLE` rejetés en transaction `READ ONLY` (25006), même pour le superutilisateur, sans effet ✔ (test réel à confirmer à la prochaine exécution) |
+| H6 | Test A1 sur la pile réelle ; PostgreSQL 16.15 de test | Verrou déjà tenu : `lock_timeout` (55P03), rien créé, verrou libre ensuite ✔ |
+| H7 | PostgreSQL 16.15 de test ; `test_h7_*` | Un `GRANT` non validé est visible dans la même transaction, annulé par le `ROLLBACK` ✔ (test réel à confirmer à la prochaine exécution) |
 
-`lc_messages` du serveur : _à consigner_.
+`lc_messages` du serveur : non consigné. Aucune décision du code ne
+repose sur le texte des messages d'erreur.
