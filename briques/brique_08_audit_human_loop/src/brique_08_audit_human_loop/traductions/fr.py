@@ -17,4 +17,8 @@ TEXTES_FR: dict[str, str] = {
     "fermeture.historique_titre": "Historique d'audit",
     "fermeture.historique_vide": "Aucune action enregistrée pour cette alerte.",
     "fermeture.par": "par",
+    "fermeture.indisponible": (
+        "Le journal d'audit de ce tenant n'est pas disponible pour le moment. "
+        "Contactez l'administrateur."
+    ),
 }

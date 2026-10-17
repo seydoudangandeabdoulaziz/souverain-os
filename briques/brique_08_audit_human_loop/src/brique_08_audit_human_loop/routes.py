@@ -23,6 +23,7 @@ et ça évite tout couplage sur les clés de traduction de la Brique 7
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from uuid import UUID
 
@@ -40,12 +41,31 @@ from brique_08_audit_human_loop.csrf import (
     verifier_csrf,
 )
 from brique_08_audit_human_loop.lecture import lire_historique_audit
-from brique_08_audit_human_loop.modeles import AlerteNonFermable, MotifFermeture
+from brique_08_audit_human_loop.modeles import (
+    AlerteNonFermable,
+    AuditNonProvisionne,
+    MotifFermeture,
+)
 from brique_08_audit_human_loop.persistence import fermer_alerte_avec_audit
 from brique_08_audit_human_loop.traductions import t
 
+journal = logging.getLogger(__name__)
+
 _ROLES_AUTORISES_FERMETURE = (Role.ANALYST, Role.ADMIN)
 _REPERTOIRE_TEMPLATES = Path(__file__).resolve().parent / "templates"
+
+
+def _reponse_audit_indisponible(schema: str, exc: AuditNonProvisionne) -> HTTPException:
+    """503 générique : ni nom de schéma, ni rôle, ni SQLSTATE (ADR-005, D5).
+
+    Le détail utile (schéma, code `raison`) va dans le journal, pas dans la
+    réponse.
+    """
+    journal.error("b8.audit_indisponible schema=%s raison=%s", schema, exc.raison.value)
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=t("fermeture.indisponible"),
+    )
 
 
 def construire_routes_audit() -> APIRouter:
@@ -84,7 +104,10 @@ def construire_routes_audit() -> APIRouter:
         route POST ci-dessous, ceci n'est qu'un affinage d'affichage.
         """
         pool_audit = await create_audit_pool()
-        historique = await lire_historique_audit(pool_audit, tenant.schema_name, alerte_id)
+        try:
+            historique = await lire_historique_audit(pool_audit, tenant.schema_name, alerte_id)
+        except AuditNonProvisionne as exc:
+            raise _reponse_audit_indisponible(tenant.schema_name, exc) from exc
         jeton_csrf, doit_poser_cookie = obtenir_ou_generer_jeton_csrf(request)
 
         reponse = templates.TemplateResponse(
@@ -137,6 +160,8 @@ def construire_routes_audit() -> APIRouter:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Cette alerte est introuvable ou a déjà été fermée.",
             ) from exc
+        except AuditNonProvisionne as exc:
+            raise _reponse_audit_indisponible(tenant.schema_name, exc) from exc
 
         # Ré-affiche le même fragment, désormais avec l'historique à jour
         # et sans formulaire (l'alerte n'est plus 'ouverte') — cohérent

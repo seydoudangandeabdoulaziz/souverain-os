@@ -3,16 +3,25 @@
 Utilise le pool RESTREINT de cette brique (connection.py) — il a
 exactement les privilèges SELECT nécessaires sur {tenant}.audit_log et
 shared.users (voir migration 0001), pas besoin du pool admin ici.
+
+Ce chemin ne fait JAMAIS de DDL ni de GRANT (ADR-005). Sur erreur, il
+peut seulement interroger l'état par `diagnostiquer_audit()`
+(lecture seule) pour CLASSER l'erreur — il n'importe volontairement rien
+de persistence.py.
 """
 
 from __future__ import annotations
 
+import logging
 from uuid import UUID
 
 import asyncpg
 from brique_01_postgresql.tenant_provisioning import validate_schema_name
 
-from brique_08_audit_human_loop.modeles import EntreeAudit
+from brique_08_audit_human_loop.diagnostic import diagnostiquer_audit
+from brique_08_audit_human_loop.modeles import AuditNonProvisionne, EntreeAudit, RaisonAudit
+
+journal = logging.getLogger(__name__)
 
 _REQUETE_HISTORIQUE_AUDIT = """
     SELECT a.id, a.alerte_id, a.user_id, a.motif, a.commentaire, a.created_at,
@@ -29,11 +38,15 @@ async def lire_historique_audit(
 ) -> list[EntreeAudit]:
     """Retourne l'historique, du plus récent au plus ancien.
 
-    Retourne une liste vide si {tenant}.audit_log n'existe pas encore
-    (aucune fermeture n'a jamais eu lieu pour ce tenant) — état légitime,
-    pas une erreur, même principe que TenantSansDonnees en Brique 7 mais
-    sans avoir besoin d'une exception dédiée : "aucun historique" est un
-    résultat valide pour cette page, jamais la page entière.
+    Retourne une liste vide UNIQUEMENT dans le cas légitime : le schéma et
+    le rôle existent et {tenant}.audit_log n'existe pas encore (aucune
+    fermeture n'a jamais eu lieu). Toute autre cause remonte.
+
+    Raises:
+        AuditNonProvisionne: erreur de permission alors qu'un élément du
+            contrat B8 manque (tenant non provisionné). Jamais masquée
+            en liste vide.
+        asyncpg.PostgresError: toute cause non reconnue, remontée brute.
     """
     validate_schema_name(nom_schema_tenant)
     requete = _REQUETE_HISTORIQUE_AUDIT.format(schema=nom_schema_tenant)
@@ -42,7 +55,22 @@ async def lire_historique_audit(
         async with pool_audit.acquire() as connexion:
             lignes = await connexion.fetch(requete, alerte_id)
     except asyncpg.exceptions.UndefinedTableError:
-        return []
+        diagnostic = await diagnostiquer_audit(nom_schema_tenant)
+        if diagnostic.role_existe and diagnostic.schema_existe and not diagnostic.audit_log_existe:
+            return []  # absence légitime : aucune fermeture n'a eu lieu
+        raise
+    except asyncpg.exceptions.InsufficientPrivilegeError as exc:
+        diagnostic = await diagnostiquer_audit(nom_schema_tenant)
+        manquants = diagnostic.elements_manquants
+        if manquants:
+            journal.error(
+                "b8.audit_non_provisionne schema=%s manquants=%s sqlstate=%s",
+                nom_schema_tenant,
+                ",".join(manquants),
+                exc.sqlstate,
+            )
+            raise AuditNonProvisionne(RaisonAudit.NON_PROVISIONNE) from exc
+        raise  # contrat complet : la cause est autre, on ne devine pas
 
     return [
         EntreeAudit(
