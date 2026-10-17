@@ -24,7 +24,10 @@ réparés, vide si le schéma était déjà conforme.
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -47,10 +50,17 @@ from brique_04_detection.persistence import enregistrer_detections
 from brique_05_scoring_alertes.modeles import ScoreCompte
 from brique_05_scoring_alertes.persistence import enregistrer_scores
 from brique_07_dashboard.config import get_dashboard_settings
+from brique_08_audit_human_loop import cli
 from brique_08_audit_human_loop.config import get_audit_db_settings
 from brique_08_audit_human_loop.connection import close_audit_pool, create_audit_pool
+from brique_08_audit_human_loop.diagnostic import DiagnosticAudit
 from brique_08_audit_human_loop.lecture import lire_historique_audit
-from brique_08_audit_human_loop.modeles import MotifFermeture
+from brique_08_audit_human_loop.modeles import (
+    AlerteNonFermable,
+    AuditNonProvisionne,
+    MotifFermeture,
+    RaisonAudit,
+)
 from brique_08_audit_human_loop.persistence import fermer_alerte_avec_audit
 from httpx import ASGITransport, AsyncClient
 from souverain_app.main import creer_application_complete
@@ -60,6 +70,27 @@ TENANT_CODE_NEUF = "YX"
 EMAIL_AUDITOR_NEUF = "neuf-auditor-test@example.com"
 MOT_DE_PASSE_TEST = "mot-de-passe-de-test-suffisamment-long"
 COMPTE_ALERTE_NEUF = "compte_test_neuf_01"
+SENTINELLE_COMMENTAIRE = "SENTINELLE-COMMENTAIRE-NE-DOIT-PAS-FUITER"
+
+_DIAG_CONFORME = DiagnosticAudit(
+    role_existe=True,
+    schema_existe=True,
+    audit_log_existe=True,
+    alertes_existe=True,
+    usage_schema=True,
+    audit_log_insert=True,
+    audit_log_select=True,
+    audit_log_update=False,
+    audit_log_delete=False,
+    audit_log_truncate=False,
+    alertes_select=True,
+    alertes_update=True,
+)
+
+
+async def _ne_rien_fermer() -> None:
+    """Remplace cli.close_pool dans les tests : la CLI ferme le pool admin
+    singleton, que la fixture `pool` (et le nettoyage) utilisent encore."""
 
 
 def _role_b8() -> str:
@@ -317,3 +348,339 @@ async def test_r5_une_erreur_de_permission_n_est_jamais_masquee_en_historique_vi
         ), f"exception inattendue : {type(exc).__name__}"
     else:
         pytest.fail(f"erreur de permission masquée : la lecture a retourné {resultat!r}")
+
+
+# ---------------------------------------------------------------------------
+# Tests d'acceptation (ADR-005, D2 à D6) : verrou, concurrence, anomalie,
+# classement des erreurs, journaux, CLI. Même tenant neuf, même fixtures.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a1_verrou_tenu_donne_un_timeout_sans_rien_modifier(
+    pool: asyncpg.Pool, tenant_neuf: UUID
+) -> None:
+    """Verrou advisory déjà tenu : VERROU_TIMEOUT, rien créé, verrou ré-acquérable après."""
+    from brique_08_audit_human_loop.persistence import provisionner_audit
+
+    async with pool.acquire() as autre, autre.transaction():
+        await autre.execute(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))",
+            f"souverain:b8_audit:{TENANT_NEUF}",
+        )
+        with pytest.raises(AuditNonProvisionne) as info:
+            await provisionner_audit(TENANT_NEUF)
+    assert info.value.raison is RaisonAudit.VERROU_TIMEOUT
+
+    async with pool.acquire() as connexion:
+        audit_log = await connexion.fetchval(
+            "SELECT to_regclass($1)::text", f"{TENANT_NEUF}.audit_log"
+        )
+    assert audit_log is None, "un timeout ne doit rien avoir créé"
+    assert await provisionner_audit(TENANT_NEUF), "le verrou doit être libre après le timeout"
+
+
+@pytest.mark.asyncio
+async def test_a2_provisionnements_concurrents_ne_reparent_qu_une_fois(
+    tenant_neuf: UUID,
+) -> None:
+    from brique_08_audit_human_loop.persistence import provisionner_audit
+
+    resultats = await asyncio.gather(*[provisionner_audit(TENANT_NEUF) for _ in range(5)])
+
+    assert sum(1 for r in resultats if r) == 1, "une seule exécution doit réparer"
+    assert sum(1 for r in resultats if not r) == 4, "les autres doivent trouver l'état conforme"
+
+
+@pytest.mark.asyncio
+async def test_a3_anomalie_preexistante_est_refusee_sans_rien_reparer(
+    pool: asyncpg.Pool, tenant_neuf: UUID
+) -> None:
+    from brique_08_audit_human_loop.persistence import provisionner_audit
+
+    await provisionner_audit(TENANT_NEUF)
+    async with pool.acquire() as connexion:
+        await connexion.execute(f"REVOKE USAGE ON SCHEMA {TENANT_NEUF} FROM {_role_b8()}")
+        await connexion.execute(f"GRANT DELETE ON {TENANT_NEUF}.audit_log TO {_role_b8()}")
+
+    with pytest.raises(AuditNonProvisionne) as info:
+        await provisionner_audit(TENANT_NEUF)
+    assert info.value.raison is RaisonAudit.ANOMALIE_PRIVILEGE
+
+    async with pool.acquire() as connexion:
+        usage = await connexion.fetchval(
+            "SELECT has_schema_privilege($1, $2, 'USAGE')", _role_b8(), TENANT_NEUF
+        )
+    assert usage is False, "aucune réparation ne doit être appliquée sur une anomalie"
+
+
+@pytest.mark.asyncio
+async def test_a5_tenant_neuf_sans_table_alertes_donne_alerte_non_fermable(
+    pool: asyncpg.Pool, pool_audit_neuf: asyncpg.Pool, tenant_neuf: UUID
+) -> None:
+    """Après réparation de l'audit, l'absence d'`alertes` est un 409, pas une panne."""
+    with pytest.raises(AlerteNonFermable):
+        await fermer_alerte_avec_audit(
+            pool_audit_neuf,
+            TENANT_NEUF,
+            alerte_id=uuid4(),
+            tenant_id=tenant_neuf,
+            user_id=uuid4(),
+            motif=MotifFermeture.CONFIRME,
+            commentaire=None,
+        )
+    async with pool.acquire() as connexion:
+        assert await connexion.fetchval(
+            "SELECT to_regclass($1) IS NULL", f"{TENANT_NEUF}.alertes"
+        ), "B8 ne doit jamais créer `alertes`"
+
+
+@pytest.mark.asyncio
+async def test_a6_journaux_et_reponse_sans_donnees_sensibles(
+    caplog: pytest.LogCaptureFixture,
+    pool: asyncpg.Pool,
+    pool_audit_neuf: asyncpg.Pool,
+    tenant_neuf: UUID,
+    client_auditor_neuf: AsyncClient,
+) -> None:
+    """Valeurs sentinelles : ni identifiants d'alerte, ni e-mail, ni commentaire,
+    ni texte brut d'exception dans les journaux de B8."""
+    caplog.set_level(logging.DEBUG)
+    alerte_id = await _creer_alerte(pool, TENANT_NEUF)
+
+    reponse = await client_auditor_neuf.get(f"/alertes/{alerte_id}/fermeture")  # lecture : 503
+    assert reponse.status_code == 503
+    await fermer_alerte_avec_audit(  # écriture : réparation puis succès
+        pool_audit_neuf,
+        TENANT_NEUF,
+        alerte_id=alerte_id,
+        tenant_id=tenant_neuf,
+        user_id=uuid4(),
+        motif=MotifFermeture.FAUX_POSITIF,
+        commentaire=SENTINELLE_COMMENTAIRE,
+    )
+
+    journal_b8 = "\n".join(
+        r.getMessage() for r in caplog.records if r.name.startswith("brique_08_audit_human_loop")
+    )
+    assert "b8." in journal_b8, "des événements B8 devaient être journalisés"
+    for interdit in (
+        str(alerte_id),
+        EMAIL_AUDITOR_NEUF,
+        SENTINELLE_COMMENTAIRE,
+        MOT_DE_PASSE_TEST,
+        "permission denied",
+    ):
+        assert interdit not in journal_b8, f"fuite dans les journaux : {interdit!r}"
+        assert interdit not in reponse.text
+
+
+@pytest.mark.asyncio
+async def test_d1_audit_log_absente_avec_usage_donne_liste_vide(
+    pool: asyncpg.Pool, pool_audit_neuf: asyncpg.Pool, tenant_neuf: UUID
+) -> None:
+    """Seul cas légitime de liste vide : schéma et rôle présents, audit_log absente."""
+    from brique_08_audit_human_loop.persistence import provisionner_audit
+
+    await provisionner_audit(TENANT_NEUF)
+    async with pool.acquire() as connexion:
+        await connexion.execute(f"DROP TABLE {TENANT_NEUF}.audit_log")
+
+    assert await lire_historique_audit(pool_audit_neuf, TENANT_NEUF, uuid4()) == []
+
+
+@pytest.mark.asyncio
+async def test_d2_table_absente_pour_une_autre_cause_n_est_pas_masquee(
+    pool: asyncpg.Pool,
+    pool_audit_neuf: asyncpg.Pool,
+    tenant_neuf: UUID,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Diagnostic simulé « schéma absent » : l'erreur remonte, jamais []."""
+    from brique_08_audit_human_loop.persistence import provisionner_audit
+
+    await provisionner_audit(TENANT_NEUF)
+    async with pool.acquire() as connexion:
+        await connexion.execute(f"DROP TABLE {TENANT_NEUF}.audit_log")
+
+    async def faux_diagnostic(_schema: str) -> DiagnosticAudit:
+        return replace(_DIAG_CONFORME, schema_existe=False, audit_log_existe=False)
+
+    monkeypatch.setattr("brique_08_audit_human_loop.lecture.diagnostiquer_audit", faux_diagnostic)
+    with pytest.raises(asyncpg.exceptions.UndefinedTableError):
+        await lire_historique_audit(pool_audit_neuf, TENANT_NEUF, uuid4())
+
+
+@pytest.mark.asyncio
+async def test_d3_erreur_de_permission_avec_contrat_complet_remonte_brute(
+    pool: asyncpg.Pool,
+    pool_audit_neuf: asyncpg.Pool,
+    tenant_neuf: UUID,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Diagnostic simulé « contrat complet » : la cause est autre, on ne devine pas."""
+    from brique_08_audit_human_loop.persistence import provisionner_audit
+
+    await provisionner_audit(TENANT_NEUF)
+    async with pool.acquire() as connexion:
+        await connexion.execute(f"REVOKE USAGE ON SCHEMA {TENANT_NEUF} FROM {_role_b8()}")
+
+    async def faux_diagnostic(_schema: str) -> DiagnosticAudit:
+        return _DIAG_CONFORME
+
+    monkeypatch.setattr("brique_08_audit_human_loop.lecture.diagnostiquer_audit", faux_diagnostic)
+    with pytest.raises(asyncpg.exceptions.InsufficientPrivilegeError):
+        await lire_historique_audit(pool_audit_neuf, TENANT_NEUF, uuid4())
+
+
+@pytest.mark.asyncio
+async def test_c1_usage_et_identification_donnent_le_code_2(
+    pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(cli, "close_pool", _ne_rien_fermer)
+
+    assert await cli._executer("Bad-Name", False) == cli.CODE_USAGE
+    assert await cli._executer("tenant_inconnu_zzz", False) == cli.CODE_USAGE
+
+
+@pytest.mark.asyncio
+async def test_c2_tenant_desactive_est_refuse_avec_le_code_3(
+    pool: asyncpg.Pool, tenant_neuf: UUID, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(cli, "close_pool", _ne_rien_fermer)
+    async with pool.acquire() as connexion:
+        await connexion.execute(
+            "UPDATE shared.tenants_registry SET is_active = false WHERE schema_name = $1",
+            TENANT_NEUF,
+        )
+
+    assert await cli._executer(TENANT_NEUF, False) == cli.CODE_INACTIF
+
+    async with pool.acquire() as connexion:
+        audit_log = await connexion.fetchval(
+            "SELECT to_regclass($1)::text", f"{TENANT_NEUF}.audit_log"
+        )
+    assert audit_log is None, "un refus ne doit rien modifier"
+
+
+@pytest.mark.asyncio
+async def test_c3_tenant_actif_est_repare_puis_conforme_avec_le_code_0(
+    pool: asyncpg.Pool,
+    tenant_neuf: UUID,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "close_pool", _ne_rien_fermer)
+
+    assert await cli._executer(TENANT_NEUF, False) == cli.CODE_OK
+    assert f"{TENANT_NEUF} : réparé" in capsys.readouterr().out
+
+    assert await cli._executer(TENANT_NEUF, False) == cli.CODE_OK  # idempotence
+    assert f"{TENANT_NEUF} : conforme" in capsys.readouterr().out
+
+
+@pytest.mark.asyncio
+async def test_c4_tous_continue_apres_un_echec_et_retourne_le_code_1(
+    pool: asyncpg.Pool,
+    tenant_neuf: UUID,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Le premier tenant échoue (simulé) ; TOUS les autres sont quand même traités.
+    La fonction réelle est remplacée : les vrais tenants ne sont jamais modifiés."""
+    monkeypatch.setattr(cli, "close_pool", _ne_rien_fermer)
+    appeles: list[str] = []
+
+    async def faux_provisionner(schema: str) -> list[str]:
+        appeles.append(schema)
+        if len(appeles) == 1:
+            raise AuditNonProvisionne(RaisonAudit.SCHEMA_ABSENT)
+        return []
+
+    monkeypatch.setattr(cli, "provisionner_audit", faux_provisionner)
+    async with pool.acquire() as connexion:
+        nb_actifs = await connexion.fetchval(
+            "SELECT count(*) FROM shared.tenants_registry WHERE is_active"
+        )
+    assert nb_actifs >= 2, "il faut au moins deux tenants actifs pour ce scénario"
+
+    assert await cli._executer(None, True) == cli.CODE_ECHEC
+
+    sortie = capsys.readouterr()
+    assert "échec (SCHEMA_ABSENT)" in sortie.err
+    assert "1 échec(s)" in sortie.out
+    assert len(appeles) == nb_actifs, "un échec ne doit pas interrompre les tenants suivants"
+
+
+@pytest.mark.asyncio
+async def test_c5_tous_ignore_les_tenants_inactifs(
+    pool: asyncpg.Pool,
+    tenant_neuf: UUID,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "close_pool", _ne_rien_fermer)
+    appeles: list[str] = []
+
+    async def faux_provisionner(schema: str) -> list[str]:
+        appeles.append(schema)
+        return []
+
+    monkeypatch.setattr(cli, "provisionner_audit", faux_provisionner)
+    async with pool.acquire() as connexion:
+        await connexion.execute(
+            "UPDATE shared.tenants_registry SET is_active = false WHERE schema_name = $1",
+            TENANT_NEUF,
+        )
+
+    assert await cli._executer(None, True) == cli.CODE_OK
+
+    assert f"{TENANT_NEUF} : ignoré (inactif)" in capsys.readouterr().out
+    assert TENANT_NEUF not in appeles
+
+
+class _AnnulerTransaction(Exception):
+    """Sert à forcer un ROLLBACK dans un test sans rien laisser derrière soi."""
+
+
+@pytest.mark.asyncio
+async def test_h5_transaction_read_only_rejette_ddl_et_grant_meme_pour_l_admin(
+    pool: asyncpg.Pool, tenant_neuf: UUID
+) -> None:
+    """ADR-005 (H5) : c'est le SERVEUR qui garantit qu'un diagnostic ne répare rien."""
+    async with pool.acquire() as connexion:
+        for requete in (
+            f"GRANT USAGE ON SCHEMA {TENANT_NEUF} TO {_role_b8()}",
+            f"CREATE TABLE {TENANT_NEUF}.h5_sonde (i int)",
+        ):
+            with pytest.raises(asyncpg.exceptions.ReadOnlySQLTransactionError):
+                async with connexion.transaction(readonly=True):
+                    await connexion.execute(requete)
+
+        usage = await connexion.fetchval(
+            "SELECT has_schema_privilege($1, $2, 'USAGE')", _role_b8(), TENANT_NEUF
+        )
+        sonde = await connexion.fetchval("SELECT to_regclass($1)::text", f"{TENANT_NEUF}.h5_sonde")
+    assert usage is False
+    assert sonde is None
+
+
+@pytest.mark.asyncio
+async def test_h7_un_grant_non_valide_est_visible_dans_la_meme_transaction(
+    pool: asyncpg.Pool, tenant_neuf: UUID
+) -> None:
+    """ADR-005 (H7) : le contrôle final de `provisionner_audit` repose sur ce comportement."""
+    async with pool.acquire() as connexion:
+        with pytest.raises(_AnnulerTransaction):
+            async with connexion.transaction():
+                await connexion.execute(f"GRANT USAGE ON SCHEMA {TENANT_NEUF} TO {_role_b8()}")
+                vu = await connexion.fetchval(
+                    "SELECT has_schema_privilege($1, $2, 'USAGE')", _role_b8(), TENANT_NEUF
+                )
+                assert vu is True, "le GRANT non validé doit être visible dans la transaction"
+                raise _AnnulerTransaction
+
+        apres = await connexion.fetchval(
+            "SELECT has_schema_privilege($1, $2, 'USAGE')", _role_b8(), TENANT_NEUF
+        )
+    assert apres is False, "le ROLLBACK doit annuler le GRANT"
