@@ -29,6 +29,9 @@ dependencies = [
     "pydantic-settings>=2.5.0",
 ]
 
+[project.scripts]
+souverain-audit-provisionner = "brique_08_audit_human_loop.cli:main"
+
 [tool.uv.sources]
 brique-01-postgresql = { workspace = true }
 brique-02-auth-rbac = { workspace = true }

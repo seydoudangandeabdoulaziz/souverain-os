@@ -1,8 +1,9 @@
 # Brique 8 — Audit trail + Human-in-the-loop
 
-**Statut : implémentée, en attente de validation par le fondateur (tests
-d'intégration non exécutés en environnement de génération — pas de
-PostgreSQL disponible ici, à lancer sur la machine réelle).**
+**Statut : VALIDÉE le 4 septembre 2026. Correction post-validation du
+17 octobre 2026 (provisionnement de l'audit des tenants créés après la
+migration) : implémentée, 203/203 tests verts sur la machine du
+fondateur, en attente de sa validation explicite.**
 
 ## Rôle
 
@@ -23,6 +24,38 @@ de tout le dashboard.
 - Réouverture d'une alerte fermée, modification du score, assignation
   d'une alerte à un analyste nommé — aucun de ces trois n'a été validé
   à l'analyse, aucun n'est implémenté.
+
+## Provisionnement de l'audit d'un tenant (ADR-005)
+
+`create_tenant()` (Brique 1) ne connaît pas la Brique 8 : un tenant créé
+**après** la migration `0001` n'a ni `audit_log`, ni aucun privilège pour
+le rôle `souverain_brique8_audit`. Sans provisionnement, la page de
+détail d'une alerte répond 503 (jamais un historique vide trompeur).
+
+```bash
+uv run souverain-audit-provisionner --tenant tenant_xx   # un tenant
+uv run souverain-audit-provisionner --tous               # tous les tenants actifs
+```
+
+Idempotent (rejouable sans effet), exécuté sous le pool admin.
+`alertes` est créée plus tard par la Brique 5 : la fermeture d'alerte
+répare alors le privilège manquant, une seule fois, après diagnostic.
+
+| Code | Sens |
+|---|---|
+| 0 | tout conforme ou réparé |
+| 1 | au moins un échec (SQL, verrou, schéma absent, anomalie de privilège…) |
+| 2 | usage ou identification invalide (argument, tenant inconnu) |
+| 3 | `--tenant` sur un tenant désactivé (le réactiver d'abord) |
+
+Garanties : `INSERT`/`SELECT` seulement sur `audit_log`, jamais
+`UPDATE`/`DELETE`/`TRUNCATE` ; aucun DDL ni `GRANT` sur le chemin de
+lecture ; `alertes` n'est jamais créée par cette brique.
+
+**Limite connue** : avec HTMX, une réponse 5xx n'est par défaut pas
+insérée dans la page ; le message 503 du fragment d'historique n'est donc
+pas affiché à l'écran (l'API répond bien 503). Corriger l'affichage
+touche les gabarits de la Brique 7, hors périmètre.
 
 ## Décision d'architecture centrale : immuabilité par privilège PostgreSQL réel
 
