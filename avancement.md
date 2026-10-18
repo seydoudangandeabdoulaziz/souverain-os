@@ -1160,11 +1160,11 @@ Non planifiée à ce jour dans l'ordre numéroté.
 
 ## Correction post-validation — Brique 8 : provisionnement de l'audit (17 octobre 2026)
 
-**Statut : EN VALIDATION — implémentée, 42/42 tests B8 et 203/203 tests du workspace verts sur la machine du fondateur (ThinkPad X1 Carbon Gen 6, PostgreSQL/TimescaleDB et Neo4j réels). La Brique 8 reste VALIDÉE (4 septembre 2026) ; cette correction attend sa validation explicite.**
+**Statut : VALIDÉE le 17 octobre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6, avec trois réserves documentées (voir « Limites et points non traités » et le rappel en fin de section). Contrôles : Ruff propre, 44 tests B8 et 205 tests du workspace verts (PostgreSQL/TimescaleDB et Neo4j réels). La Brique 8 était déjà VALIDÉE (4 septembre 2026) ; sa correction post-validation l'est désormais aussi.**
 
 Défaut (relevé le 29-30 septembre) : sur un tenant créé après la migration B8, la page de détail d'une alerte renvoyait un HTTP 500. **Cause confirmée sur la pile réelle** : `create_tenant()` ne provisionne rien pour le rôle `souverain_brique8_audit` (ni `USAGE` sur le schéma, ni `audit_log`) ; PostgreSQL lève `InsufficientPrivilegeError` (42501), que ni la lecture ni l'écriture n'interceptaient (seul 42P01 l'était). La fixture de test accordait `USAGE` à la main, ce qui masquait le défaut.
 
-Décision : ADR-005 (provisionnement par commande explicite, réparation défensive à l'écriture, lecture sans DDL). Statut de l'ADR : Proposed, critères techniques remplis, en attente de validation.
+Décision : ADR-005 (provisionnement par commande explicite, réparation défensive à l'écriture, lecture sans DDL). Statut de l'ADR : Acceptée le 17 octobre 2026.
 
 Livré (Brique 8 uniquement ; migration `0001`, B1, B2, B7, CSRF et RBAC inchangés) :
 - `diagnostic.py` : diagnostic en lecture seule (transaction `READ ONLY`), seul accès du chemin de lecture au pool admin.
@@ -1183,6 +1183,10 @@ Limites et points non traités (signalés, pas oubliés) :
 - Migration `0001` de B8 : son `GRANT … ON alertes` n'est pas gardé et pourrait échouer pour un tenant sans table `alertes`. Défaut suspecté (lu dans le SQL), **non reproduit, non évalué**, non corrigé ; à traiter séparément par une migration corrective distincte.
 - `create_tenant()` n'appelle pas le provisionnement de B8 : l'étape reste manuelle (automatisation à réexaminer en Phase 2).
 - Traçabilité de la commande dans une table d'audit : non faite (le pool admin n'est pas le rôle de gouvernance).
+
+Réserves actées par le fondateur lors de la validation (inchangées, détaillées ci-dessus) : (1) migration `0001` de B8 à examiner séparément ; (2) affichage HTMX du 503 côté Brique 7 ; (3) provisionnement des nouveaux tenants toujours manuel.
+
+**Correction post-validation de la Brique 8 (provisionnement de l'audit) VALIDÉE le 17 octobre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
 
 ## Règle
 

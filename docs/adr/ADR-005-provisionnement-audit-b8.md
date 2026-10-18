@@ -1,9 +1,11 @@
 # ADR-005 — Provisionnement de l'audit B8 par commande explicite
 
-**Statut : Proposée (Proposed) — critères techniques remplis le 17 octobre
-2026 ; passe à « Acceptée » sur validation explicite du fondateur.**
-Implémentation validée par 203/203 tests sur la machine du fondateur
-(voir « Critère de passage » et « Annexe »).
+**Statut : Acceptée le 17 octobre 2026, par le fondateur, lors de la
+validation de la correction de la Brique 8, avec les trois réserves
+documentées (migration `0001`, affichage HTMX du 503, provisionnement
+manuel des nouveaux tenants).**
+Implémentation validée par 205/205 tests sur la machine du fondateur,
+dont 44 pour la Brique 8 (voir « Critère de passage » et « Annexe »).
 **Date : 17 octobre 2026**
 **Décideur : Seydou Dangande Abdoul Aziz (fondateur)**
 
@@ -478,7 +480,7 @@ l'acceptation par un diagnostic simulé.
    test (H3 à H7) et les tests d'acceptation permanents de
    `test_tenant_neuf.py` (dont `test_h5_*` et `test_h7_*`).
 2. **Résultats consignés** : oui, annexe ci-dessous.
-3. **Validation du fondateur** : en attente.
+3. **Validation du fondateur** : obtenue le 17 octobre 2026.
 
 ## Points ouverts
 
