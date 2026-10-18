@@ -2,8 +2,10 @@
 
 **Statut : VALIDÉE le 4 septembre 2026. Correction post-validation du
 17 octobre 2026 (provisionnement de l'audit des tenants créés après la
-migration) : implémentée, 203/203 tests verts sur la machine du
-fondateur, en attente de sa validation explicite.**
+migration) : VALIDÉE par le fondateur le 17 octobre 2026, avec trois
+réserves (migration `0001` à examiner séparément, affichage HTMX du 503
+côté Brique 7, provisionnement des nouveaux tenants toujours manuel).
+Tests : 44 pour cette brique, 205 pour le workspace.**
 
 ## Rôle
 
