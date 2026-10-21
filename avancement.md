@@ -394,7 +394,7 @@ Décision actée après validation : la création d'utilisateur via interface (r
 
 ## Détail — Brique 8 (Audit trail + Human-in-the-loop)
 
-**Statut : EN VALIDATION — implémentée, 138/138 tests passés sur la machine réelle du fondateur (ThinkPad X1 Carbon Gen 6, PostgreSQL + Neo4j réels), zéro régression sur les Briques 0 à 7. Reste la vérification manuelle dans un vrai navigateur avant validation explicite.**
+**Statut : VALIDÉE le 4 septembre 2026, par le fondateur, sur ThinkPad X1 Carbon Gen 6. Implémentée, 138/138 tests passés sur PostgreSQL et Neo4j réels, zéro régression sur les Briques 0 à 7. La vérification manuelle dans un vrai navigateur a été effectuée ; la vérification visuelle du rôle `auditor` reste couverte par les tests automatisés, jugés suffisants par le fondateur.**
 
 Décisions d'architecture actées (analyse validée avant implémentation, en plusieurs passes) :
 - Actions humaines couvertes : fermeture d'alerte avec motif structuré (liste fermée : `faux_positif`, `confirme`, `en_cours_investigation`) + commentaire optionnel. Pas de réouverture, pas de modification du score, pas d'assignation.
