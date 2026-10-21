@@ -44,7 +44,7 @@ VALIDÉE
 | 3 | UX/UI (fondations) | **VALIDÉE** |
 | 4 | Prometheus/Grafana | **VALIDÉE** (4a + 4b) |
 | 5 | Test de charge du pipeline actuel | **VALIDÉE** |
-| 6 | Ollama/Mistral (→ Ministral 3 8B, voir détail) | 6a EN ANALYSE / TESTÉE, 6b NON COMMENCÉE |
+| 6 | Ollama/Mistral (→ Ministral 3 8B, voir détail) | 6a VALIDÉE (clôture simplifiée le 20 octobre 2026), 6b NON COMMENCÉE |
 | 7 | Sécurité IA/RAG (conception) | NON COMMENCÉE |
 | 8 | RAG | NON COMMENCÉE |
 | 9 | Redis/Celery (conditionnel à l'étape 5) | NON COMMENCÉE |
@@ -1077,9 +1077,10 @@ données supprimés après vérification complète.
 
 ## Détail — Étape 6a (faisabilité du modèle LLM local)
 
-**Statut : EN ANALYSE / TESTÉE — faisabilité confirmée le 7 octobre
-2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1
-Carbon Gen 6. Intégration (6b) non commencée.**
+**Statut : VALIDÉE — faisabilité confirmée le 7 octobre 2026, étape
+clôturée le 20 octobre 2026 (clôture simplifiée, décision du fondateur
+Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.
+Intégration (6b) non commencée.**
 
 Décision de direction actée avant tout test (28 septembre 2026) : pas
 de benchmark comparatif multi-modèles — test de faisabilité ciblé sur
@@ -1112,9 +1113,16 @@ in-transit`, évoquant un problème de suivi de connexion (`conntrack`)
 plutôt qu'un simple blocage de pare-feu. **Contourné par une
 installation native d'Ollama** (`curl -fsSL https://ollama.com/
 install.sh | sh`, service `systemd`), qui n'a rencontré aucun
-problème réseau. Décision de revenir ou non à une exécution
-conteneurisée pour l'Étape 6b **non tranchée**, à décider
-explicitement avant l'intégration.
+problème réseau. Une explication (TTL des paquets entrants réécrit par
+le WiFi, contournement par une règle `nft` temporaire) est consignée
+dans `docs/architecture/decisions.md` ; cette règle n'était plus
+présente le 20 octobre 2026.
+
+**Décision du 20 octobre 2026** : l'exécution se fera **en conteneur
+Docker** (service `ollama` du `docker-compose.yml`) ; l'installation
+native n'a servi qu'au test de faisabilité. Une fois le modèle dans le
+volume, l'inférence fonctionne sans réseau : le blocage réseau ne gêne
+que les téléchargements.
 
 **Résultats** : critères PASS, avec deux réserves documentées —
 RAM mesurée à 6,53 GiB contre un seuil fixé à 6,5 Go (écart de
@@ -1135,10 +1143,27 @@ est renforcé. Fonctionnement sans connexion réseau confirmé
 manuellement par le fondateur (WiFi physiquement coupé, génération
 réussie).
 
-**Étape 6a close. Prête pour l'analyse de l'Étape 6b (intégration)
-dès demande explicite du fondateur**, sous réserve de trancher au
-préalable la question de l'exécution native vs conteneurisée du
-service Ollama.
+**Étape 6a clôturée le 20 octobre 2026 (clôture simplifiée). Prête
+pour l'analyse de l'Étape 6b (intégration) dès demande explicite du
+fondateur.**
+
+Reste à faire au début de la 6b (détail dans `VERDICT_ETAPE_6A.md`,
+section « Décision de clôture ») :
+1. mettre le modèle dans le volume du compose et vérifier son digest
+   (`1922accd5827`) ;
+2. mesurer la RAM du conteneur ;
+3. rédiger l'ADR-006 (exécution conteneurisée) ;
+4. désactiver puis, après vérification, désinstaller l'Ollama natif
+   (même port 11434) ;
+5. réparer ou documenter le réseau des conteneurs (téléchargements) ;
+6. faire reconfirmer par le fondateur le caractère « non bloquant » du
+   défaut de fidélité.
+
+Mises en cohérence documentaires faites le 20 octobre 2026 :
+`docs/architecture/decisions.md` §8 reflète la décision (conteneur) ; la
+roadmap cite désormais `ADR-004-changement-modele-llm.md` (elle citait
+`ADR-00X`) ; `.env.example` propose le modèle Ministral 3 8B (en
+commentaire).
 
 ## Campagne fonctionnelle (parcours analyste, 6 scénarios de fraude synthétique)
 

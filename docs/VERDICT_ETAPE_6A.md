@@ -1,6 +1,6 @@
 # SOUVERAIN-OS — Étape 6a : Verdict de faisabilité Ministral 3 8B
 
-**Date : 7 octobre 2026. Corrigé le 13 octobre 2026 (voir « Historique des corrections » en fin de document).**
+**Date : 7 octobre 2026. Corrigé le 13 octobre 2026. Étape clôturée le 20 octobre 2026 (voir « Historique des corrections » en fin de document).**
 **Validé par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
 
 ---
@@ -98,16 +98,36 @@ Mesure réelle : **6,53 GiB** de RSS sur le processus `llama-server` (sous-proce
 
 Le protocole de l'Étape 6a prévoyait un conteneur Docker isolé (`souverain-bench-ollama`), cohérent avec le reste de l'architecture SOUVERAIN-OS (entièrement conteneurisée). Un problème réseau non résolu avec certitude (tout conteneur Docker, sans exception, incapable de faire sortir du trafic vers internet sur cette machine, malgré vérification du pare-feu `ufw`, du NAT, du routage et de `ip_forward`) a conduit à un contournement pragmatique : installation native d'Ollama via le script officiel (`curl -fsSL https://ollama.com/install.sh | sh`), en service `systemd`.
 
-**Conséquence pour l'Étape 6b** : la question de revenir à une exécution conteneurisée, pour la cohérence architecturale du projet, reste **ouverte et non tranchée**. Elle devra faire l'objet d'une décision explicite séparée avant l'intégration finale, idéalement après avoir identifié la vraie cause du blocage réseau Docker observé ce jour.
+## Décision de clôture (20 octobre 2026)
+
+**Décision : Ollama s'exécutera en conteneur Docker**, comme le reste de SOUVERAIN-OS, et non en installation native. Le service existe déjà dans `docker-compose.yml` (profile `ollama`, image figée par digest, port lié à `127.0.0.1:11434`, volume nommé `ollama_data`, healthcheck). Ce choix remplace l'installation native utilisée uniquement pour le test de faisabilité. Il sera formalisé par un ADR (ADR-006) au début de la 6b.
+
+**Pourquoi le conteneur** : cohérence avec l'architecture, version figée, volume nommé, port limité à la machine. Une fois le modèle présent dans le volume, l'inférence fonctionne **sans accès réseau** : le blocage réseau de Docker ne concerne que les téléchargements (images, modèles), pas l'usage.
+
+**État constaté le 20 octobre 2026** (sorties de la machine du fondateur) :
+- le service Ollama natif est arrêté (`inactive`) ; son état au démarrage de la machine n'a pas été vérifié ;
+- aucun conteneur Ollama ne tourne ;
+- deux volumes existent : `ollama-bench-data` (benchmark du 13 octobre) et `souverain-os_ollama_data` (celui du compose) ; lequel contient le modèle n'a pas été vérifié ;
+- la règle réseau de contournement (`nft`) n'est pas présente, et l'état du réseau des conteneurs n'a pas été revérifié.
+
+**Ce qui n'est PAS fait et passe au début de la 6b** :
+1. mettre le modèle dans le volume du compose et vérifier son digest (`1922accd5827`) ;
+2. mesurer la RAM du conteneur (la RAM mesurée en natif reste classée « PASS avec réserve », seuil non modifié) ;
+3. rédiger l'ADR-006 (exécution conteneurisée) ;
+4. désactiver puis, après vérification du conteneur, désinstaller l'Ollama natif (les deux utilisent le port 11434 et ne peuvent pas tourner ensemble) ;
+5. réparer ou documenter le réseau des conteneurs pour les futurs téléchargements ;
+6. faire reconfirmer par le fondateur le caractère « non bloquant » du défaut de fidélité (voir plus haut).
+
+**Résultats du benchmark conteneur du 13 octobre** : leur détail n'a pas été conservé dans le dépôt et n'est pas reconstitué ici. Seule la mention « mêmes erreurs de fidélité sur 4 fiches » (voir plus haut) est retenue. La mesure de RAM du point 2 la remplace.
 
 ## Conclusion
 
 Ministral 3 8B Instruct Q4_K_M est **validé comme faisable** sur le matériel cible (ThinkPad X1 Carbon Gen 6, CPU seul, 14 Gi RAM), avec une réserve RAM mineure documentée et un défaut de fidélité récurrent (confusion poids/nombre, 4 fiches sur 10) identifié, atténué lors d'un test avec faits étiquetés, et encadré par les invariants existants. Aucun critère éliminatoire n'a été franchi de façon significative.
 
-**Prêt pour l'analyse de l'Étape 6b (intégration) dès demande explicite du fondateur**, sous réserve de trancher au préalable la question de l'exécution native vs conteneurisée.
+**Étape 6a clôturée le 20 octobre 2026 (clôture simplifiée).** La décision d'exécution est prise (conteneur). **Prête pour l'analyse de l'Étape 6b (intégration) dès demande explicite du fondateur**, dont les premières tâches sont les six points listés dans « Décision de clôture ».
 
 ## Historique des corrections
 
 - **7 octobre 2026** : version initiale (test de faisabilité en installation native).
 - **13 octobre 2026** : la portée du défaut de fidélité est corrigée (un cas → 4 fiches sur 10) ; ajout du test complémentaire avec faits étiquetés et de ses limites ; la décision « non bloquant » est marquée à reconfirmer.
-- Les résultats du benchmark exécuté dans le conteneur Docker (13 octobre) ne sont **pas encore intégrés** à ce document : ils le seront lors de la clôture de l'Étape 6a, une fois les décisions en suspens (classement de la RAM, ports, suppression de l'Ollama natif) prises.
+- **20 octobre 2026** : clôture simplifiée de l'Étape 6a. Décision : exécution en conteneur Docker. Les vérifications techniques (modèle dans le volume, digest, RAM du conteneur, ports, ADR-006, Ollama natif) passent au début de la 6b. Les résultats détaillés du benchmark conteneur du 13 octobre ne sont pas reconstitués.

@@ -11,7 +11,8 @@ Ce fichier résume les décisions actées. Le détail argumenté de chaque déci
 | Moteur de traduction | NLLB-200-distilled-600M (Transformers/CTranslate2), distinct d'Ollama ; M2M100 en repli identifié pour le zarma si besoin | ADR-002 | Acceptée |
 ## 8. Modèle LLM local — Ministral 3 8B (remplace la mention Mistral 7B)
 
-**Ajouté le 7 octobre 2026, corrigé le 13 octobre 2026, suite à l'analyse et
+**Ajouté le 7 octobre 2026, corrigé le 13 octobre 2026, complété le 20
+octobre 2026, suite à l'analyse et
 au test de faisabilité de l'Étape 6a (détail complet : `docs/VERDICT_ETAPE_6A.md`,
 `docs/adr/ADR-004-changement-modele-llm.md`).**
 
@@ -56,13 +57,16 @@ au test de faisabilité de l'Étape 6a (détail complet : `docs/VERDICT_ETAPE_6A
   demande, sans impact sur B4/B5/B6, sans décision automatique, sans
   RAG, sans agent, sans génération de requête SQL/Cypher, sans partage
   de données inter-tenant. La décision humaine n'est jamais remplacée.
-- **Point non tranché, signalé explicitement** : le test de la 6a a été
-  réalisé avec Ollama en **installation native** (hors Docker), suite à un
-  blocage réseau des conteneurs sur la machine de développement. Ce
-  blocage a depuis été expliqué (le réseau WiFi utilisé réécrit à 1 le TTL
-  des paquets entrants, ce qui fait expirer ceux transmis aux conteneurs ;
-  contournement temporaire par une règle `nft`). Un service `ollama` en
-  conteneur a été ajouté au `docker-compose.yml` (profile `ollama`) ; la
-  clôture de la 6a (comparaison avec le natif, suppression de l'installation
-  native) reste à faire.
+- **Exécution : conteneur Docker (décision du 20 octobre 2026, clôture de
+  la 6a).** Le test de la 6a a été réalisé avec Ollama en **installation
+  native** à cause d'un blocage réseau des conteneurs (le réseau WiFi
+  utilisé réécrit à 1 le TTL des paquets entrants ; contournement temporaire
+  par une règle `nft`, absente le 20 octobre). L'exécution cible est le
+  service `ollama` du `docker-compose.yml` (profile `ollama`, image figée
+  par digest, port lié à `127.0.0.1`, volume nommé). Une fois le modèle dans
+  le volume, l'inférence fonctionne sans réseau ; le blocage ne gêne que les
+  téléchargements. L'ADR-006 formalisera ce choix au début de la 6b, avec la
+  vérification du digest du modèle, la mesure de RAM du conteneur et le
+  retrait de l'Ollama natif (voir `docs/VERDICT_ETAPE_6A.md`, section
+  « Décision de clôture »).
 Toute nouvelle décision architecturale doit faire l'objet d'un nouvel ADR avant d'être appliquée.

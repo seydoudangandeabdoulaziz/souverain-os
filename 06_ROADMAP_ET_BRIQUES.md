@@ -45,7 +45,7 @@ Après le flux fonctionnel principal :
 Instruct Q4_K_M**, pas Mistral 7B Q4_K_M du document fondateur.
 Décision actée après test de faisabilité (Étape 6a), détaillée dans
 `00_DECISIONS_VERROUILLEES.md` section 8 et
-`docs/adr/ADR-00X-changement-modele-llm.md`. Mistral 7B reste cité ici
+`docs/adr/ADR-004-changement-modele-llm.md`. Mistral 7B reste cité ici
 et dans le document fondateur comme référence historique uniquement.
 
 ## Points en suspens — hors de cet ordre numéroté
