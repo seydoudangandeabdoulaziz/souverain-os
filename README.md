@@ -6,9 +6,12 @@ Mission : premier système immunitaire numérique africain — détection et ana
 
 Porteur du projet : **Seydou Dangande Abdoul Aziz** — EMIG, Niamey, Niger.
 
-> **Statut actuel : reconstruction Greenfield en cours.**
-> Consulter `avancement.md` pour l'état réel, brique par brique.
-
+> **Statut actuel :** les briques 0 à 8 sont indiquées comme validées dans le suivi du projet.
+> **Étape 6A :** clôturée le 20 octobre 2026.
+> **Étape 6B :** non commencée.
+>
+> Consulter [`avancement.md`](./avancement.md) pour l'état détaillé,
+> les validations et les réserves éventuelles.
 ---
 
 ## Principe de lecture de ce dépôt
@@ -27,7 +30,7 @@ Voir [`avancement.md`](./avancement.md) pour le statut détaillé de chaque briq
 
 Voir [`ARCHITECTURE.md`](./ARCHITECTURE.md) pour la vue d'ensemble technique et [`docs/architecture/`](./docs/architecture/) pour le détail.
 
-## Ordre de reconstruction validé
+## Ordre des briques du projet
 
 0. Fondations
 1. PostgreSQL / TimescaleDB multi-tenant
@@ -39,8 +42,15 @@ Voir [`ARCHITECTURE.md`](./ARCHITECTURE.md) pour la vue d'ensemble technique et 
 7. Dashboard / investigation
 8. Audit trail + Human-in-the-loop
 
-Puis, en phase transverse : RAG, Ollama/Mistral, PQC, Redis/Celery, Prometheus/Grafana, SOUVERAIN-ID complet.
+Les briques 0 à 8 sont indiquées comme validées dans le suivi du projet.
 
+Les composants transverses — RAG, Ollama/Mistral, PQC,
+Redis/Celery, Prometheus/Grafana et SOUVERAIN-ID complet —
+doivent être suivis selon leur état réel dans `avancement.md`.
+
+L'étape 6 est divisée en deux phases :
+- **6A — Faisabilité de l'inférence locale :** clôturée le 20 octobre 2026.
+- **6B — Explication des alertes par l'IA :** non commencée.
 ## Démarrage rapide (Brique 0)
 
 ```bash
