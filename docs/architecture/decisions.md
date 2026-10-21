@@ -9,6 +9,8 @@ Ce fichier résume les décisions actées. Le détail argumenté de chaque déci
 | Ordre de reconstruction | Fondations → données → identité → ingestion → détection → scoring/alertes → graphe → investigation → audit | ADR-000 | Acceptée |
 | Multilinguisme produit | FR + langues locales par pays (haoussa/zarma pour le Niger) — objectif acté, implémentation différée à la Brique 7 et à une future brique notifications | ADR-001 | Acceptée |
 | Moteur de traduction | NLLB-200-distilled-600M (Transformers/CTranslate2), distinct d'Ollama ; M2M100 en repli identifié pour le zarma si besoin | ADR-002 | Acceptée |
+| Déploiement Ollama dans Docker | Environnement cible, avec réserve mémoire et tests de fidélité | ADR-006 | Acceptée en principe — réserves ouvertes |
+
 ## 8. Modèle LLM local — Ministral 3 8B (remplace la mention Mistral 7B)
 
 **Ajouté le 7 octobre 2026, corrigé le 13 octobre 2026, complété le 20
@@ -65,8 +67,9 @@ au test de faisabilité de l'Étape 6a (détail complet : `docs/VERDICT_ETAPE_6A
   service `ollama` du `docker-compose.yml` (profile `ollama`, image figée
   par digest, port lié à `127.0.0.1`, volume nommé). Une fois le modèle dans
   le volume, l'inférence fonctionne sans réseau ; le blocage ne gêne que les
-  téléchargements. L'ADR-006 formalisera ce choix au début de la 6b, avec la
-  vérification du digest du modèle, la mesure de RAM du conteneur et le
-  retrait de l'Ollama natif (voir `docs/VERDICT_ETAPE_6A.md`, section
-  « Décision de clôture »).
+  téléchargements. L'ADR-006 (`docs/adr/ADR-006-deploiement-ollama-docker.md`)
+  formalise ce choix, accepté en principe avec réserves ouvertes.
+  Le pic mémoire observé pendant le test du 21 octobre est de
+  6,618 Gio, au-dessus du seuil historique de 6,5 Gio ; cette réserve reste
+  ouverte. Aucun retrait d'Ollama natif n'est autorisé par cet ADR.
 Toute nouvelle décision architecturale doit faire l'objet d'un nouvel ADR avant d'être appliquée.
