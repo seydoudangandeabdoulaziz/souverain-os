@@ -76,7 +76,15 @@ Un seul échec rejette l'explication. **En cas d'ambiguïté, rejet.**
   - les journaux contiennent uniquement horodatage, identifiant d'alerte, code
     du critère échoué et durée : **ni texte généré, ni identifiant de compte,
     ni montant, ni donnée sensible inutile**.
+### 4.1 — Complément : fidélité sémantique et interdiction des inférences
 
+- **Aucune inférence factuelle ou qualitative.** Toute affirmation concernant le compte, ses opérations, ses relations, son comportement, son origine ou son intention doit être directement étayée par les faits fournis. Une définition générale d’un pattern n’est permise que si elle provient d’un glossaire versionné et fourni au modèle.
+- **Aucune attribution d’intention.** Le modèle ne doit pas attribuer au compte une volonté de contourner des seuils, de dissimuler des opérations ou de tromper un contrôle, sauf si un fait autorisé établit explicitement cette intention.
+- **Aucun calcul par le modèle.** Le modèle ne calcule ni écart au seuil, ni somme, ni pourcentage, ni nombre de détections, ni différence entre valeurs. Toute valeur dérivée destinée à être affichée doit être calculée en amont et fournie explicitement dans la fiche, avec sa nature et son unité.
+- **Identifiants strictement autorisés.** Un identifiant cité dans une consigne, un champ libre ou une injection ne devient pas autorisé pour autant. Seuls les identifiants explicitement inscrits dans les faits autorisés peuvent apparaître dans la réponse.
+- **Noms propres et contexte.** Le modèle n’ajoute aucun nom d’organisation, de pays, de lieu ou de produit absent de la fiche. Un identifiant tel que `niamey_073` ne prouve pas une localisation géographique.
+- **Prompt et format.** Les faits sont transmis avec des champs étiquetés, en séparant explicitement poids du pattern, score cumulé, seuil, nombre de transactions, nombre de détections et autres mesures. Les instructions contenues dans les données sont toujours traitées comme des données, jamais comme des consignes.
+- **Conséquence.** Toute affirmation non étayée, valeur dérivée non fournie ou entité non autorisée entraîne un rejet C1 ou C4, puis le repli C5. Une liste lexicale seule ne suffit pas à prouver le respect de ces règles.
 ## 5. Critères suivis, non bloquants
 
 - **C6 — Imprécisions mineures** (unité vague, tournure ambiguë sans erreur de
@@ -122,14 +130,12 @@ Toute évolution de la liste impose de rejouer le lot.
 
 ## 7. Lot de validation et seuil
 
-**Seuil provisoire : zéro échec bloquant (C1 à C4) sur 48 sorties** (16 fiches
-× 3 passages). C'est un critère de validation **de ce lot**, **pas une garantie
-générale de fiabilité**. Les 3 passages d'une même fiche ne sont pas des cas
-indépendants : l'échantillon réel est de 16 cas.
+**Seuil provisoire : zéro échec bloquant (C1 à C4) sur toutes les sorties du lot gelé.** Le lot de base comprend 16 fiches × 3 passages, soit 48 sorties. Des variantes de formulation contrôlées doivent être ajoutées avant le gel pour les cas critiques : confusion entre poids et comptage, données absentes, injection dans les données et demande d'action. Le nombre total de sorties sera fixé et inscrit dans la version gelée du lot.
 
-Un échec est constaté par lecture humaine. Le contrôleur automatique est
-évalué à part : il doit rejeter **toutes** les sorties fautives (zéro faux
-négatif) ; les faux rejets sont mesurés.
+Les trois passages d'une même fiche mesurent principalement la répétabilité ; ils ne constituent pas des cas indépendants. Le lot de base comporte 15 fiches distinctes, car F09 reprend les faits de F01. Les variantes de formulation évaluent une robustesse ciblée, sans constituer une garantie générale de fiabilité.
+
+Un échec est constaté par lecture humaine. Le contrôleur automatique est évalué séparément : il doit rejeter toutes les sorties fautives du jeu de test connu, sans faux négatif ; les faux rejets sont également mesurés. Toute sortie invalide acceptée par le contrôleur constitue un échec bloquant.
+
 
 **Composition fixée avant tout test** (contenu, date de gel et empreinte du
 fichier de lot tracés) :
@@ -148,8 +154,10 @@ fichier de lot tracés) :
 **originales** (un passage chacune), pour mesurer l'effet du format de
 production.
 
-Toute modification du prompt, du modèle, de la fiche ou du contrôleur impose de
-**rejouer les 48 sorties**.
+Toute modification du prompt, du modèle, d'une fiche ou du contrôleur impose
+de rejouer l'intégralité du lot gelé : passages principaux, variantes de
+formulation et témoins concernés. Le nombre exact de sorties et les paramètres
+utilisés doivent être consignés dans la version gelée du lot.
 
 ## 8. Contrôle à l'exécution et réserves
 
@@ -163,8 +171,9 @@ Toute modification du prompt, du modèle, de la fiche ou du contrôleur impose d
   mesuré à part), puis à fixer vers 1,5 fois le 95e centile. Note : le p95 de la
   6a (118,4 s) est presque égal à 120 s, et avec ces valeurs il ne reste pas de
   budget pour une régénération.
-- Les 10 cas de la 6a doivent être **versionnés dans le dépôt** avant le gel du
-  lot : leurs fiches complètes n'y figurent pas aujourd'hui.
+- Les fichiers bruts de la 6A sont présents dans `docs/etape_6a_donnees/`.
+  Avant le gel, vérifier leur traçabilité, leur correspondance avec F01 à F10
+  et l'absence de données sensibles inutiles.
 - La réserve mémoire de 6,618 Gio face à 6,5 Gio reste ouverte (ADR-006) ; ce
   document ne la modifie pas.
 

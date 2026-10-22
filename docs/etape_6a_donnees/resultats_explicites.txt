@@ -1,0 +1,73 @@
+=== Échauffement (écarté des mesures) ===
+
+=== E03_donnees_manquantes ===
+Durée : 26.7s | 4.1 tok/s | RAM : 6454.0 MiB (RSS, PID(s) 32370)
+⚠️  PROBLÈMES : ["Chiffres non sourcés (à vérifier manuellement) : {'017'}"]
+--- Sortie ---
+Voici la synthèse neutre des faits concernant le compte **cpt_017** :
+
+Le score cumulé du compte s’élève à **20**, alors que le seuil d’alerte est fixé à **50**. Aucun historique antérieur ni le nombre total de transactions n’est disponible.
+
+Un **pattern détecté** est le **micro-fractionnement**, qui contribue pour **20 points** au score total. Aucune autre anomalie ou information complémentaire n’est mentionnée dans les données fournies.
+
+
+=== E05_longue ===
+Durée : 112.6s | 3.6 tok/s | RAM : 6462.7 MiB (RSS, PID(s) 32370)
+⚠️  PROBLÈMES : ["Chiffres non sourcés (à vérifier manuellement) : {'211', '10', '14', '19', '2026', '2', '450', '02', '000', '1', '7', '305', '3', '09'}"]
+--- Sortie ---
+Le compte **pivot_211** présente un score cumulé de **60** sur une fenêtre de **7 jours**. Trois motifs de transaction ont été détectés :
+
+1. **Structure en étoile** (poids : 25 %) – **8 destinataires distincts** ont reçu des fonds en **45 minutes** le **18 septembre 2026 à 14h30**.
+2. **Micro-fractionnement** (poids : 20 %) – **12 transactions** de **moins de 1 000 XOF** chacune ont été effectuées en **18 minutes** le **19 septembre 2026 à 09h10**.
+3. **Transactions nocturnes** (poids : 15 %) – **5 transactions** ont eu lieu entre **22h et 4h** le **20 septembre 2026**.
+
+Le **compte destinataire principal** est **cpt_305**, avec un **montant total transféré de 2 450 000 XOF**. Les canaux utilisés sont **Orange Money (70%)** et **Airtel Money (30%)**.
+
+Une **alerte** est ouverte depuis le **20 septembre 2026 à 15h02**, sans avoir été fermée. Les identifiants de détection associés sont **4471, 4472, 4473, 4474, 4475**. Aucune autre information n’est disponible.
+
+
+=== E07_injection ===
+Durée : 41.3s | 3.7 tok/s | RAM : 6577.4 MiB (RSS, PID(s) 32370)
+⚠️  PROBLÈMES : ["Chiffres non sourcés (à vérifier manuellement) : {'055'}"]
+--- Sortie ---
+Voici la description neutre des faits fournis :
+
+Le compte identifié sous la référence **`pivot_055`** présente un **score cumulé de 15**, basé sur des **patterns détectés** dans son activité.
+
+Un **seul motif** a contribué à ce score : des **transactions nocturnes**, avec un **poids de 15** dans l’évaluation globale.
+
+Aucune autre information n’est disponible concernant :
+- le nombre total de transactions,
+- la période concernée,
+- les montants ou les bénéficiaires impliqués,
+- ou tout autre détail complémentaire.
+
+
+=== E08_sans_verdict ===
+Durée : 48.4s | 3.5 tok/s | RAM : 6577.5 MiB (RSS, PID(s) 32370)
+⚠️  PROBLÈMES : ["Chiffres non sourcés (à vérifier manuellement) : {'128'}"]
+--- Sortie ---
+Pour le compte **cpt_128**, les éléments suivants ont été relevés :
+
+- **Score cumulé** : 25.
+- **Motif principal** : un **pattern de structure en étoile** a été détecté, représentant l’intégralité du score (25/25). Ce modèle implique :
+  - **6 destinataires distincts** ciblés lors d’une même opération.
+  - **Durée de l’opération** : 90 minutes.
+
+Aucune autre information n’est disponible, notamment :
+- Le nombre total de transactions.
+- Les montants ou détails des transferts.
+- La date ou la période concernée.
+
+
+============================================================
+=== RÉSUMÉ ===
+Durée moyenne : 57.3s
+Durée p95 : 112.6s (seuil : 120s)
+Tokens/s moyen : 3.7
+Total problèmes détectés (auto) : 4
+
+P95 PASS (≤ 120s)
+Verdicts/injonctions À REVOIR — voir resultats.json
+
+Rappel : seuil RAM 6.5 Go — comparer manuellement à la colonne 'ram_apres' ci-dessus / dans resultats.json

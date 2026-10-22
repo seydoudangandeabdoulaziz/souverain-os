@@ -20,11 +20,13 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.30.0",
     "prometheus-client>=0.21.0",
+    "brique-05-scoring-alertes",
 ]
 
 [tool.uv.sources]
 brique-01-postgresql = { workspace = true }
 brique-02-auth-rbac = { workspace = true }
+brique-05-scoring-alertes = { workspace = true }
 brique-07-dashboard = { workspace = true }
 brique-08-audit-human-loop = { workspace = true }
 

@@ -1227,6 +1227,7 @@ source = { editable = "souverain_app" }
 dependencies = [
     { name = "brique-01-postgresql" },
     { name = "brique-02-auth-rbac" },
+    { name = "brique-05-scoring-alertes" },
     { name = "brique-07-dashboard" },
     { name = "brique-08-audit-human-loop" },
     { name = "fastapi" },
@@ -1244,6 +1245,7 @@ dev = [
 requires-dist = [
     { name = "brique-01-postgresql", editable = "briques/brique_01_postgresql" },
     { name = "brique-02-auth-rbac", editable = "briques/brique_02_auth_rbac" },
+    { name = "brique-05-scoring-alertes", editable = "briques/brique_05_scoring_alertes" },
     { name = "brique-07-dashboard", editable = "briques/brique_07_dashboard" },
     { name = "brique-08-audit-human-loop", editable = "briques/brique_08_audit_human_loop" },
     { name = "fastapi", specifier = ">=0.115.0" },

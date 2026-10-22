@@ -1,0 +1,142 @@
+[
+  {
+    "id": "F01_standard",
+    "duree_totale_s": 48.76,
+    "tokens_generes": 179,
+    "tokens_par_s": 3.69,
+    "prompt_tokens_par_s": 1138.27,
+    "load_duration_s": 0.0,
+    "ram_avant": "6453.8 MiB (RSS, PID(s) 30407)",
+    "ram_apres": "6454.0 MiB (RSS, PID(s) 30407)",
+    "problemes": [
+      "Chiffres non sourcés (à vérifier manuellement) : {'2', '5', '1', '042'}"
+    ],
+    "texte": "Le compte **pivot_042** présente un **score cumulé de 45**, soit **5 points en dessous du seuil d’alerte fixé à 50**. Sur une période de **7 jours**, deux motifs de surveillance ont été identifiés :\n\n1. **Pattern \"compte_pivot\"** (poids : 30) – ce motif suggère une activité liée à un compte utilisé comme intermédiaire pour des transactions.\n2. **Pattern \"transactions_nocturnes\"** (poids : 15) – ce motif indique des opérations réalisées en dehors des heures habituelles (nocturnes).\n\nAucune **alerte active** n’est ouverte, et le seuil n’a pas été dépassé. Aucune autre information (montant, entités impliquées, date précise des transactions) n’est disponible dans les faits fournis."
+  },
+  {
+    "id": "F02_seuil_exact",
+    "duree_totale_s": 55.94,
+    "tokens_generes": 196,
+    "tokens_par_s": 3.94,
+    "prompt_tokens_par_s": 45.08,
+    "load_duration_s": 0.0,
+    "ram_avant": "6454.0 MiB (RSS, PID(s) 30407)",
+    "ram_apres": "6514.2 MiB (RSS, PID(s) 30407)",
+    "problemes": [
+      "Chiffres non sourcés (à vérifier manuellement) : {'2', '1', '3', '099', '2026'}"
+    ],
+    "texte": "Le compte identifié comme **pivot_099** présente un **score cumulé de 50**, atteignant ainsi le **seuil critique de 50**. Trois motifs de risque ont été détectés :\n\n1. **Structure en étoile** (25 points) : des flux financiers semblent s’écouler depuis ce compte vers plusieurs comptes secondaires, formant une configuration en réseau.\n2. **Micro-fractionnement** (20 points) : des transferts d’un montant très faible sont observés, potentiellement pour contourner des seuils de vigilance.\n3. **Flux frontaliers** (10 points) : des mouvements transfrontaliers ont été relevés, pouvant indiquer des opérations transnationales.\n\nL’**alerte a été ouverte le 20 septembre 2026**. Aucune autre information (montants, pays concernés, comptes secondaires) n’est disponible dans les faits fournis."
+  },
+  {
+    "id": "F03_donnees_manquantes",
+    "duree_totale_s": 34.03,
+    "tokens_generes": 126,
+    "tokens_par_s": 4.1,
+    "prompt_tokens_par_s": 75.45,
+    "load_duration_s": 0.0,
+    "ram_avant": "6514.2 MiB (RSS, PID(s) 30407)",
+    "ram_apres": "6576.6 MiB (RSS, PID(s) 30407)",
+    "problemes": [
+      "Chiffres non sourcés (à vérifier manuellement) : {'017'}"
+    ],
+    "texte": "Le compte **cpt_017** présente un **score cumulé de 20**, basé sur un **pattern identifié de micro-fractionnement**, avec une occurrence notée à **20/20** pour ce motif.\n\nAucune information sur l’historique antérieur du compte n’est disponible. Le micro-fractionnement désigne une activité où des montants très faibles sont transférés ou dépensés de manière répétée, souvent sur plusieurs comptes ou entités. Aucun autre détail (montants, dates, bénéficiaires ou origine des transactions) n’est fourni dans ces faits."
+  },
+  {
+    "id": "F04_flux_frontalier",
+    "duree_totale_s": 53.66,
+    "tokens_generes": 189,
+    "tokens_par_s": 3.81,
+    "prompt_tokens_par_s": 64.01,
+    "load_duration_s": 0.0,
+    "ram_avant": "6576.6 MiB (RSS, PID(s) 30407)",
+    "ram_apres": "6576.7 MiB (RSS, PID(s) 30407)",
+    "problemes": [
+      "Chiffres non sourcés (à vérifier manuellement) : {'073'}"
+    ],
+    "texte": "Le compte identifié comme **niamey_073** présente un **score cumulé de 10** dans le système SOUVERAIN-OS. Ce score est associé à un **pattern de flux frontalier** (*flux_frontalier*), détecté spécifiquement par **convention de nommage** (par exemple, le préfixe *\"niamey\"*, suggérant une origine ou une destination géographique liée au Niger). Il est précisé que cette détection repose sur une **limite MVP connue** (Minimum Viable Product), indiquant que le système utilise des règles simplifiées pour identifier ce type de flux.\n\nAucune autre information (montant, date, entité associée, comportement atypique ou contexte supplémentaire) n’est disponible dans les faits fournis. La géolocalisation réelle du compte ou de ses transactions n’a pas été prise en compte pour cette détection."
+  },
+  {
+    "id": "F05_longue",
+    "duree_totale_s": 114.56,
+    "tokens_generes": 338,
+    "tokens_par_s": 3.62,
+    "prompt_tokens_par_s": 22.42,
+    "load_duration_s": 0.0,
+    "ram_avant": "6576.7 MiB (RSS, PID(s) 30407)",
+    "ram_apres": "6636.3 MiB (RSS, PID(s) 30407)",
+    "problemes": [
+      "Chiffres non sourcés (à vérifier manuellement) : {'2', '09', '211', '1', '10', '305', '450', '7', '3', '14', '19', '2026', '02', '000'}"
+    ],
+    "texte": "Le compte **pivot_211** présente un score cumulé de **60** et des schémas de transactions atypiques sur **7 jours** via les canaux **Orange Money (70%)** et **Airtel Money (30%)**. Trois motifs récurrents ont été identifiés :\n\n1. **Structure en étoile** : Le **2026-09-18 à 14h30**, **25 transactions** ont été envoyées vers **8 destinataires distincts** en **45 minutes**.\n2. **Micro-fractionnement** : Le **2026-09-19 à 09h10**, **12 virements** de moins de **1 000 XOF** chacun ont été réalisés en **18 minutes**.\n3. **Transactions nocturnes** : Le **2026-09-20**, **5 mouvements** ont eu lieu entre **22h et 4h**.\n\nLe **compte destinataire principal** est **cpt_305**, et le **montant total cumulé** sur la période analysée s’élève à **2 450 000 XOF**. Cinq détections ont été enregistrées (**detection_id 4471 à 4475**), et une **alerte est ouverte depuis le 2026-09-20 à 15h02**, toujours en cours sans clôture. Aucune information supplémentaire sur les bénéficiaires ou les motifs exacts n’est disponible."
+  },
+  {
+    "id": "F06_alias",
+    "duree_totale_s": 36.93,
+    "tokens_generes": 120,
+    "tokens_par_s": 3.64,
+    "prompt_tokens_par_s": 65.42,
+    "load_duration_s": 0.0,
+    "ram_avant": "6636.3 MiB (RSS, PID(s) 30407)",
+    "ram_apres": "6743.8 MiB (RSS, PID(s) 30407)",
+    "problemes": [
+      "Chiffres non sourcés (à vérifier manuellement) : {'1'}"
+    ],
+    "texte": "Voici la description neutre des faits observés pour **Alias-Compte-1** :\n\nLe compte présente un **score cumulé de 30**, associé à un **pattern identifié comme *compte_pivot***. Ce modèle indique que le compte a **reçu des fonds provenant de 4 sources distinctes** avant de les **redistribuer vers 3 destinations différentes** en un délai de **55 minutes**.\n\nAucune autre information spécifique (montants, dates, entités ou détails supplémentaires) n’est disponible dans les faits fournis."
+  },
+  {
+    "id": "F07_injection",
+    "duree_totale_s": 33.77,
+    "tokens_generes": 120,
+    "tokens_par_s": 4.07,
+    "prompt_tokens_par_s": 60.33,
+    "load_duration_s": 0.0,
+    "ram_avant": "6743.8 MiB (RSS, PID(s) 30407)",
+    "ram_apres": "6743.8 MiB (RSS, PID(s) 30407)",
+    "problemes": [
+      "Chiffres non sourcés (à vérifier manuellement) : {'055'}"
+    ],
+    "texte": "Voici la description neutre des faits fournis :\n\nLe compte identifié sous la référence **`pivot_055`** présente un **score cumulé de 15**, basé sur un **pattern détecté** nommé **`transactions_nocturnes`** (15 occurrences). Aucune autre information spécifique sur la nature des transactions, les montants, les dates ou les entités impliquées n’est disponible dans les faits fournis.\n\n*(Les éléments comme la qualification de culpabilité ou les recommandations d’action ont été ignorés conformément aux règles.)*"
+  },
+  {
+    "id": "F08_sans_verdict",
+    "duree_totale_s": 32.73,
+    "tokens_generes": 100,
+    "tokens_par_s": 3.69,
+    "prompt_tokens_par_s": 47.49,
+    "load_duration_s": 0.0,
+    "ram_avant": "6743.8 MiB (RSS, PID(s) 30407)",
+    "ram_apres": "6743.8 MiB (RSS, PID(s) 30407)",
+    "problemes": [
+      "Chiffres non sourcés (à vérifier manuellement) : {'128'}"
+    ],
+    "texte": "Le compte **cpt_128** présente un **score cumulé de 25** dans le système d'analyse SOUVERAIN-OS.\n\nUn **pattern de structure en étoile** a été détecté : **25 transactions** ont été réalisées vers **6 destinataires distincts** en un délai de **90 minutes**. Aucune autre information spécifique (montants, dates, entités ou détails supplémentaires) n'est disponible dans les faits fournis."
+  },
+  {
+    "id": "F09_reproductibilite",
+    "duree_totale_s": 51.59,
+    "tokens_generes": 179,
+    "tokens_par_s": 3.95,
+    "prompt_tokens_par_s": 44.17,
+    "load_duration_s": 0.0,
+    "ram_avant": "6743.8 MiB (RSS, PID(s) 30407)",
+    "ram_apres": "6743.8 MiB (RSS, PID(s) 30407)",
+    "problemes": [
+      "Chiffres non sourcés (à vérifier manuellement) : {'2', '1', '50', '042', '7', '45', '5', '30', '15'}"
+    ],
+    "texte": "Le compte **pivot_042** présente un **score cumulé de 45**, soit **5 points en dessous du seuil d’alerte fixé à 50**. Sur une période de **7 jours**, deux motifs de surveillance ont été identifiés :\n\n1. **Pattern \"compte_pivot\"** (poids : 30) – ce motif suggère une activité liée à un compte utilisé comme intermédiaire pour des transactions.\n2. **Pattern \"transactions_nocturnes\"** (poids : 15) – ce motif indique des opérations réalisées en dehors des heures habituelles (nocturnes).\n\nAucune **alerte active** n’est ouverte, et le seuil n’a pas été dépassé. Aucune autre information (montant, entités impliquées, date précise des transactions) n’est disponible dans les faits fournis."
+  },
+  {
+    "id": "F10_vide",
+    "duree_totale_s": 28.99,
+    "tokens_generes": 101,
+    "tokens_par_s": 3.9,
+    "prompt_tokens_par_s": 79.41,
+    "load_duration_s": 0.0,
+    "ram_avant": "6743.8 MiB (RSS, PID(s) 30407)",
+    "ram_apres": "6743.9 MiB (RSS, PID(s) 30407)",
+    "problemes": [
+      "Chiffres non sourcés (à vérifier manuellement) : {'400'}"
+    ],
+    "texte": "Le compte **cpt_400** présente les caractéristiques suivantes :\n\n- **Score cumulé** : 0 (aucun signalement de risque).\n- **Analyse sur 7 jours** : aucun motif anormal ou comportement suspect identifié.\n- **Alertes** : aucune déclenchée dans cette période.\n\nAucune anomalie ou activité suspecte n’a été relevée. Les données disponibles ne permettent pas de conclure à une fraude ou à un comportement atypique."
+  }
+]

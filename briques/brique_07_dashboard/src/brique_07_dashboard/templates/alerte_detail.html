@@ -41,6 +41,16 @@
     <p class="chargement">{{ t('alerte_detail.chargement_graphe', langue) }}</p>
 </div>
 
+<div id="explication-ia">
+    <button type="button"
+            hx-get="/alertes/{{ alerte.alerte_id }}/expliquer"
+            hx-target="#explication-ia"
+            hx-swap="innerHTML">
+        Expliquer cette alerte
+    </button>
+    <p class="aide">L’explication est produite localement à partir des faits enregistrés.</p>
+</div>
+
 {# Point d'intégration Brique 8 (Audit + Human-in-the-loop), ajout
    minimal validé à l'analyse — seule ligne touchée dans ce fichier
    Brique 7 déjà validé. Le fragment (formulaire de fermeture +

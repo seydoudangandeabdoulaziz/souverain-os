@@ -48,6 +48,8 @@ from fastapi import FastAPI, Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from starlette.responses import JSONResponse
 
+from souverain_app.explication_routes import construire_routes_explication
+
 _logger = logging.getLogger("souverain_app.requetes")
 _logger.setLevel(logging.INFO)
 if not _logger.handlers:
@@ -71,6 +73,7 @@ def creer_application_complete() -> FastAPI:
     app = creer_application()
     app.include_router(construire_routes_audit())
     app.include_router(construire_routes_gouvernance())
+    app.include_router(construire_routes_explication())
 
     @app.middleware("http")
     async def journaliser_requete(

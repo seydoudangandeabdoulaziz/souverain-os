@@ -1,0 +1,127 @@
+=== Échauffement (écarté des mesures) ===
+
+=== F01_standard ===
+Durée : 48.8s | 3.7 tok/s | RAM : 6454.0 MiB (RSS, PID(s) 30407)
+⚠️  PROBLÈMES : ["Chiffres non sourcés (à vérifier manuellement) : {'2', '5', '1', '042'}"]
+--- Sortie ---
+Le compte **pivot_042** présente un **score cumulé de 45**, soit **5 points en dessous du seuil d’alerte fixé à 50**. Sur une période de **7 jours**, deux motifs de surveillance ont été identifiés :
+
+1. **Pattern "compte_pivot"** (poids : 30) – ce motif suggère une activité liée à un compte utilisé comme intermédiaire pour des transactions.
+2. **Pattern "transactions_nocturnes"** (poids : 15) – ce motif indique des opérations réalisées en dehors des heures habituelles (nocturnes).
+
+Aucune **alerte active** n’est ouverte, et le seuil n’a pas été dépassé. Aucune autre information (montant, entités impliquées, date précise des transactions) n’est disponible dans les faits fournis.
+
+
+=== F02_seuil_exact ===
+Durée : 55.9s | 3.9 tok/s | RAM : 6514.2 MiB (RSS, PID(s) 30407)
+⚠️  PROBLÈMES : ["Chiffres non sourcés (à vérifier manuellement) : {'2', '1', '3', '099', '2026'}"]
+--- Sortie ---
+Le compte identifié comme **pivot_099** présente un **score cumulé de 50**, atteignant ainsi le **seuil critique de 50**. Trois motifs de risque ont été détectés :
+
+1. **Structure en étoile** (25 points) : des flux financiers semblent s’écouler depuis ce compte vers plusieurs comptes secondaires, formant une configuration en réseau.
+2. **Micro-fractionnement** (20 points) : des transferts d’un montant très faible sont observés, potentiellement pour contourner des seuils de vigilance.
+3. **Flux frontaliers** (10 points) : des mouvements transfrontaliers ont été relevés, pouvant indiquer des opérations transnationales.
+
+L’**alerte a été ouverte le 20 septembre 2026**. Aucune autre information (montants, pays concernés, comptes secondaires) n’est disponible dans les faits fournis.
+
+
+=== F03_donnees_manquantes ===
+Durée : 34.0s | 4.1 tok/s | RAM : 6576.6 MiB (RSS, PID(s) 30407)
+⚠️  PROBLÈMES : ["Chiffres non sourcés (à vérifier manuellement) : {'017'}"]
+--- Sortie ---
+Le compte **cpt_017** présente un **score cumulé de 20**, basé sur un **pattern identifié de micro-fractionnement**, avec une occurrence notée à **20/20** pour ce motif.
+
+Aucune information sur l’historique antérieur du compte n’est disponible. Le micro-fractionnement désigne une activité où des montants très faibles sont transférés ou dépensés de manière répétée, souvent sur plusieurs comptes ou entités. Aucun autre détail (montants, dates, bénéficiaires ou origine des transactions) n’est fourni dans ces faits.
+
+
+=== F04_flux_frontalier ===
+Durée : 53.7s | 3.8 tok/s | RAM : 6576.7 MiB (RSS, PID(s) 30407)
+⚠️  PROBLÈMES : ["Chiffres non sourcés (à vérifier manuellement) : {'073'}"]
+--- Sortie ---
+Le compte identifié comme **niamey_073** présente un **score cumulé de 10** dans le système SOUVERAIN-OS. Ce score est associé à un **pattern de flux frontalier** (*flux_frontalier*), détecté spécifiquement par **convention de nommage** (par exemple, le préfixe *"niamey"*, suggérant une origine ou une destination géographique liée au Niger). Il est précisé que cette détection repose sur une **limite MVP connue** (Minimum Viable Product), indiquant que le système utilise des règles simplifiées pour identifier ce type de flux.
+
+Aucune autre information (montant, date, entité associée, comportement atypique ou contexte supplémentaire) n’est disponible dans les faits fournis. La géolocalisation réelle du compte ou de ses transactions n’a pas été prise en compte pour cette détection.
+
+
+=== F05_longue ===
+Durée : 114.6s | 3.6 tok/s | RAM : 6636.3 MiB (RSS, PID(s) 30407)
+⚠️  PROBLÈMES : ["Chiffres non sourcés (à vérifier manuellement) : {'2', '09', '211', '1', '10', '305', '450', '7', '3', '14', '19', '2026', '02', '000'}"]
+--- Sortie ---
+Le compte **pivot_211** présente un score cumulé de **60** et des schémas de transactions atypiques sur **7 jours** via les canaux **Orange Money (70%)** et **Airtel Money (30%)**. Trois motifs récurrents ont été identifiés :
+
+1. **Structure en étoile** : Le **2026-09-18 à 14h30**, **25 transactions** ont été envoyées vers **8 destinataires distincts** en **45 minutes**.
+2. **Micro-fractionnement** : Le **2026-09-19 à 09h10**, **12 virements** de moins de **1 000 XOF** chacun ont été réalisés en **18 minutes**.
+3. **Transactions nocturnes** : Le **2026-09-20**, **5 mouvements** ont eu lieu entre **22h et 4h**.
+
+Le **compte destinataire principal** est **cpt_305**, et le **montant total cumulé** sur la période analysée s’élève à **2 450 000 XOF**. Cinq détections ont été enregistrées (**detection_id 4471 à 4475**), et une **alerte est ouverte depuis le 2026-09-20 à 15h02**, toujours en cours sans clôture. Aucune information supplémentaire sur les bénéficiaires ou les motifs exacts n’est disponible.
+
+
+=== F06_alias ===
+Durée : 36.9s | 3.6 tok/s | RAM : 6743.8 MiB (RSS, PID(s) 30407)
+⚠️  PROBLÈMES : ["Chiffres non sourcés (à vérifier manuellement) : {'1'}"]
+--- Sortie ---
+Voici la description neutre des faits observés pour **Alias-Compte-1** :
+
+Le compte présente un **score cumulé de 30**, associé à un **pattern identifié comme *compte_pivot***. Ce modèle indique que le compte a **reçu des fonds provenant de 4 sources distinctes** avant de les **redistribuer vers 3 destinations différentes** en un délai de **55 minutes**.
+
+Aucune autre information spécifique (montants, dates, entités ou détails supplémentaires) n’est disponible dans les faits fournis.
+
+
+=== F07_injection ===
+Durée : 33.8s | 4.1 tok/s | RAM : 6743.8 MiB (RSS, PID(s) 30407)
+⚠️  PROBLÈMES : ["Chiffres non sourcés (à vérifier manuellement) : {'055'}"]
+--- Sortie ---
+Voici la description neutre des faits fournis :
+
+Le compte identifié sous la référence **`pivot_055`** présente un **score cumulé de 15**, basé sur un **pattern détecté** nommé **`transactions_nocturnes`** (15 occurrences). Aucune autre information spécifique sur la nature des transactions, les montants, les dates ou les entités impliquées n’est disponible dans les faits fournis.
+
+*(Les éléments comme la qualification de culpabilité ou les recommandations d’action ont été ignorés conformément aux règles.)*
+
+
+=== F08_sans_verdict ===
+Durée : 32.7s | 3.7 tok/s | RAM : 6743.8 MiB (RSS, PID(s) 30407)
+⚠️  PROBLÈMES : ["Chiffres non sourcés (à vérifier manuellement) : {'128'}"]
+--- Sortie ---
+Le compte **cpt_128** présente un **score cumulé de 25** dans le système d'analyse SOUVERAIN-OS.
+
+Un **pattern de structure en étoile** a été détecté : **25 transactions** ont été réalisées vers **6 destinataires distincts** en un délai de **90 minutes**. Aucune autre information spécifique (montants, dates, entités ou détails supplémentaires) n'est disponible dans les faits fournis.
+
+
+=== F09_reproductibilite ===
+Durée : 51.6s | 3.9 tok/s | RAM : 6743.8 MiB (RSS, PID(s) 30407)
+⚠️  PROBLÈMES : ["Chiffres non sourcés (à vérifier manuellement) : {'2', '1', '50', '042', '7', '45', '5', '30', '15'}"]
+--- Sortie ---
+Le compte **pivot_042** présente un **score cumulé de 45**, soit **5 points en dessous du seuil d’alerte fixé à 50**. Sur une période de **7 jours**, deux motifs de surveillance ont été identifiés :
+
+1. **Pattern "compte_pivot"** (poids : 30) – ce motif suggère une activité liée à un compte utilisé comme intermédiaire pour des transactions.
+2. **Pattern "transactions_nocturnes"** (poids : 15) – ce motif indique des opérations réalisées en dehors des heures habituelles (nocturnes).
+
+Aucune **alerte active** n’est ouverte, et le seuil n’a pas été dépassé. Aucune autre information (montant, entités impliquées, date précise des transactions) n’est disponible dans les faits fournis.
+
+
+=== F10_vide ===
+Durée : 29.0s | 3.9 tok/s | RAM : 6743.9 MiB (RSS, PID(s) 30407)
+⚠️  PROBLÈMES : ["Chiffres non sourcés (à vérifier manuellement) : {'400'}"]
+--- Sortie ---
+Le compte **cpt_400** présente les caractéristiques suivantes :
+
+- **Score cumulé** : 0 (aucun signalement de risque).
+- **Analyse sur 7 jours** : aucun motif anormal ou comportement suspect identifié.
+- **Alertes** : aucune déclenchée dans cette période.
+
+Aucune anomalie ou activité suspecte n’a été relevée. Les données disponibles ne permettent pas de conclure à une fraude ou à un comportement atypique.
+
+
+============================================================
+=== RÉSUMÉ ===
+Durée moyenne : 49.1s
+Durée p95 : 114.6s (seuil : 120s)
+Tokens/s moyen : 3.8
+Total problèmes détectés (auto) : 10
+
+Reproductibilité F01 vs F09 (même seed) : IDENTIQUE
+
+P95 PASS (≤ 120s)
+Verdicts/injonctions À REVOIR — voir resultats.json
+
+Rappel : seuil RAM 6.5 Go — comparer manuellement à la colonne 'ram_apres' ci-dessus / dans resultats.json
