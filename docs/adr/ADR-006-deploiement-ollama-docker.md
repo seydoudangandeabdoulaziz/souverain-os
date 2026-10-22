@@ -95,3 +95,13 @@ de démarrer l'étape 6b, de désinstaller Ollama natif ou de procéder
 définition et à la réussite des tests de fidélité des explications.
 La réserve mémoire de 6,618 Gio face au seuil historique de 6,5 Gio
 reste explicitement ouverte.
+
+## 7. Mise à jour du 22 octobre 2026 — grille de fidélité
+
+Les critères de fidélité exigés aux §2 (point 6) et §4 sont définis dans
+`docs/ETAPE_6B_GRILLE_FIDELITE.md`, validée en principe par le fondateur le
+22 octobre 2026, avec réserves. Cette validation de principe ne vaut pas
+réussite des tests : l'étape 6b reste bloquée jusqu'à la démonstration du
+contrôle sur les erreurs connues (F03, F05, F07, F08) et la réussite du lot
+de validation. Les réserves ouvertes (mémoire, timeout provisoire) sont
+inchangées.

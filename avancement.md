@@ -44,7 +44,7 @@ VALIDÉE
 | 3 | UX/UI (fondations) | **VALIDÉE** |
 | 4 | Prometheus/Grafana | **VALIDÉE** (4a + 4b) |
 | 5 | Test de charge du pipeline actuel | **VALIDÉE** |
-| 6 | Ollama/Mistral (→ Ministral 3 8B, voir détail) | 6a VALIDÉE (clôture simplifiée le 20 octobre 2026), 6b NON COMMENCÉE |
+| 6 | Ollama/Mistral (→ Ministral 3 8B, voir détail) | 6a VALIDÉE (clôture simplifiée le 20 octobre 2026), 6b NON COMMENCÉE — grille de fidélité validée en principe (22 octobre 2026), tests à réussir avant démarrage |
 | 7 | Sécurité IA/RAG (conception) | NON COMMENCÉE |
 | 8 | RAG | NON COMMENCÉE |
 | 9 | Redis/Celery (conditionnel à l'étape 5) | NON COMMENCÉE |
@@ -1164,6 +1164,40 @@ Mises en cohérence documentaires faites le 20 octobre 2026 :
 roadmap cite désormais `ADR-004-changement-modele-llm.md` (elle citait
 `ADR-00X`) ; `.env.example` propose le modèle Ministral 3 8B (en
 commentaire).
+
+## Détail — Étape 6b : prérequis — grille de fidélité des explications IA
+
+**Statut : grille VALIDÉE EN PRINCIPE par le fondateur le 22 octobre 2026,
+avec réserves. Étape 6b NON COMMENCÉE, bloquée (ADR-006, §6) tant que le
+contrôle n'est pas démontré sur les erreurs connues et que le lot de
+validation n'est pas réussi.**
+
+Document : `docs/ETAPE_6B_GRILLE_FIDELITE.md` (renvoi depuis
+`docs/adr/ADR-006-deploiement-ollama-docker.md`, §7).
+
+Contenu retenu :
+- 5 critères bloquants (exactitude numérique avec signification,
+  non-confusion des grandeurs, aucun verdict ni injonction, aucune entité
+  étrangère à la fiche, repli sur les faits structurés) ; 2 critères suivis
+  (imprécisions mineures, forme : 120 mots / 6 phrases, repli au-delà de 200).
+- Seuil provisoire : zéro échec bloquant sur 48 sorties (16 fiches × 3
+  passages, soit 16 cas indépendants) — critère de validation du lot, pas une
+  garantie générale de fiabilité.
+- Historique des décisions humaines exclu de la fiche de faits ; journaux sans
+  texte généré.
+
+Réserves du fondateur :
+- timeout Ollama (120 s par tentative, 180 s au total) provisoire jusqu'à
+  mesure sur la machine ;
+- les 10 cas de la 6a sont conservés et reformulés au format de production ;
+  F03, F05, F07 et F08 gardent aussi leurs sorties originales comme témoins ;
+- le contrôle de fidélité doit être testé sur les erreurs connues avant toute
+  intégration.
+
+Reste à faire avant la 6b : versionner les 10 fiches de la 6a (absentes du
+dépôt), figer le lot, prototyper et tester le contrôle, mesurer durée et
+mémoire. Réserve mémoire (6,618 Gio contre 6,5 Gio) toujours ouverte. Aucun
+fichier de B4, B5 ou B6 modifié.
 
 ## Campagne fonctionnelle (parcours analyste, 6 scénarios de fraude synthétique)
 
