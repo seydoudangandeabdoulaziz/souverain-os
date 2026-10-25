@@ -44,7 +44,7 @@ VALIDÉE
 | 3 | UX/UI (fondations) | **VALIDÉE** |
 | 4 | Prometheus/Grafana | **VALIDÉE** (4a + 4b) |
 | 5 | Test de charge du pipeline actuel | **VALIDÉE** |
-| 6 | Ollama/Mistral (→ Ministral 3 8B, voir détail) | 6a VALIDÉE (clôture simplifiée le 20 octobre 2026), 6b NON COMMENCÉE — grille de fidélité validée en principe (22 octobre 2026), tests à réussir avant démarrage |
+| 6 | Ollama/Mistral (→ Ministral 3 8B, voir détail) | 6a VALIDÉE (20 octobre 2026), 6b EN TEST — 256 tests du workspace réussis, Ruff propre ; lot officiel et critères C1–C5 encore à valider |
 | 7 | Sécurité IA/RAG (conception) | NON COMMENCÉE |
 | 8 | RAG | NON COMMENCÉE |
 | 9 | Redis/Celery (conditionnel à l'étape 5) | NON COMMENCÉE |
@@ -1165,39 +1165,60 @@ roadmap cite désormais `ADR-004-changement-modele-llm.md` (elle citait
 `ADR-00X`) ; `.env.example` propose le modèle Ministral 3 8B (en
 commentaire).
 
-## Détail — Étape 6b : prérequis — grille de fidélité des explications IA
+## Détail — Étape 6b : explications IA fidèles et contrôlées
 
-**Statut : grille VALIDÉE EN PRINCIPE par le fondateur le 22 octobre 2026,
-avec réserves. Étape 6b NON COMMENCÉE, bloquée (ADR-006, §6) tant que le
-contrôle n'est pas démontré sur les erreurs connues et que le lot de
-validation n'est pas réussi.**
+**Statut : EN TEST — NON VALIDÉE.** Les contrôles locaux progressent,
+mais le lot officiel et les critères C1–C5 restent à valider.
 
-Document : `docs/ETAPE_6B_GRILLE_FIDELITE.md` (renvoi depuis
-`docs/adr/ADR-006-deploiement-ollama-docker.md`, §7).
+### Résultats locaux
 
-Contenu retenu :
-- 5 critères bloquants (exactitude numérique avec signification,
-  non-confusion des grandeurs, aucun verdict ni injonction, aucune entité
-  étrangère à la fiche, repli sur les faits structurés) ; 2 critères suivis
-  (imprécisions mineures, forme : 120 mots / 6 phrases, repli au-delà de 200).
-- Seuil provisoire : zéro échec bloquant sur 48 sorties (16 fiches × 3
-  passages, soit 16 cas indépendants) — critère de validation du lot, pas une
-  garantie générale de fiabilité.
-- Historique des décisions humaines exclu de la fiche de faits ; journaux sans
-  texte généré.
+- Tests ciblés : 51 réussis.
+- Suite complète : 256 tests réussis en 40,21 s.
+- Ruff : contrôles ciblés réussis.
+- Les témoins historiques F03, F05, F07 et F08 déclenchent le repli
+  déterministe lorsqu'ils sont fournis à la place du JSON structuré.
+- Ces résultats ne prouvent pas la fidélité des 48 sorties officielles.
 
-Réserves du fondateur :
-- timeout Ollama (120 s par tentative, 180 s au total) provisoire jusqu'à
-  mesure sur la machine ;
-- les 10 cas de la 6a sont conservés et reformulés au format de production ;
-  F03, F05, F07 et F08 gardent aussi leurs sorties originales comme témoins ;
-- le contrôle de fidélité doit être testé sur les erreurs connues avant toute
-  intégration.
+### Travail restant
 
-Reste à faire avant la 6b : versionner les 10 fiches de la 6a (absentes du
-dépôt), figer le lot, prototyper et tester le contrôle, mesurer durée et
-mémoire. Réserve mémoire (6,618 Gio contre 6,5 Gio) toujours ouverte. Aucun
-fichier de B4, B5 ou B6 modifié.
+1. Vérifier les entrées, le modèle et son digest, le prompt et les paramètres.
+2. Tester les erreurs connues et mesurer les faux négatifs et faux rejets.
+3. Exécuter le lot officiel : 16 fiches × 3 passages, soit 48 sorties,
+   avec les témoins historiques et les variantes adverses.
+4. Vérifier les critères bloquants C1–C4 et le fonctionnement du repli C5.
+5. Mesurer et documenter les durées et la mémoire. La réserve historique
+   de 6,618 Gio contre 6,5 Gio reste ouverte.
+6. Présenter le bilan au fondateur. La validation officielle exige son
+   approbation explicite.
+
+Aucun changement aux Briques 4, 5 ou 6 n'est autorisé dans cette étape.
+Aucun RAG, agent ou SQL/Cypher généré n'est introduit.
+
+Après clôture explicite de l'étape 6, reprendre l'étape 7 — Sécurité IA/RAG
+(conception). Aucune étape 6C n'est ajoutée.
+
+### Références et réserves initiales conservées
+
+- Grille de fidélité : `docs/ETAPE_6B_GRILLE_FIDELITE.md`.
+- Décision de déploiement : `docs/adr/ADR-006-deploiement-ollama-docker.md`,
+  notamment les sections 6 et 7.
+- Critères bloquants : exactitude numérique et signification, absence de
+  confusion entre grandeurs, absence de verdict ou d'injonction, absence
+  d'entités étrangères à la fiche et repli sur les faits structurés.
+- Critères suivis : imprécisions mineures et respect du format prévu
+  (120 mots / 6 phrases ; repli au-delà de 200 mots).
+- Seuil de validation du lot : zéro échec bloquant sur 48 sorties
+  (16 fiches × 3 passages). Ce seuil ne garantit pas une fiabilité générale.
+- L'historique des décisions humaines reste exclu de la fiche de faits ;
+  les journaux ne doivent pas contenir le texte généré.
+- Timeout initial : 120 s par tentative, 180 s au total, à confirmer par
+  mesure sur la machine.
+- Les 10 cas de la 6a doivent être versionnés et adaptés au format de
+  production ; F03, F05, F07 et F08 conservent leurs sorties originales
+  comme témoins.
+- Le lot officiel doit être figé, le contrôle éprouvé sur les erreurs connues
+  et les variantes adverses, puis la durée et la mémoire mesurées.
+- La réserve mémoire historique de 6,618 Gio contre 6,5 Gio reste ouverte.
 
 ## Campagne fonctionnelle (parcours analyste, 6 scénarios de fraude synthétique)
 

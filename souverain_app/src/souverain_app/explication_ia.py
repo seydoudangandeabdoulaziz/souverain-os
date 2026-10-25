@@ -35,9 +35,11 @@ class FaitsAlerte:
     fenetre_debut: date | None = None
     fenetre_fin: date | None = None
 
-
 def _valider_faits(faits: FaitsAlerte) -> None:
     """Valide les faits avant de construire le texte affiché."""
+    if not isinstance(faits, FaitsAlerte):
+        raise ValueError("Structure des faits invalide")
+
     if (
         not isinstance(faits.compte_pivot, str)
         or not faits.compte_pivot
@@ -57,7 +59,10 @@ def _valider_faits(faits: FaitsAlerte) -> None:
         ):
             raise ValueError(f"{nom} invalide")
 
-    if faits.statut not in {"ouverte", "fermee"}:
+    if (
+        not isinstance(faits.statut, str)
+        or faits.statut not in {"ouverte", "fermee"}
+    ):
         raise ValueError("Statut d'alerte invalide")
 
     if faits.nombre_transactions is not None and (
@@ -67,10 +72,18 @@ def _valider_faits(faits: FaitsAlerte) -> None:
     ):
         raise ValueError("Nombre de transactions invalide")
 
+    if not isinstance(faits.motifs, (tuple, list)):
+        raise ValueError("Liste des motifs invalide")
+
     motifs_vus: set[str] = set()
-    for nom, poids in faits.motifs:
+    for motif in faits.motifs:
+        if not isinstance(motif, (tuple, list)) or len(motif) != 2:
+            raise ValueError("Format de motif invalide")
+
+        nom, poids = motif
         if (
-            nom not in POIDS_PAR_PATTERN
+            not isinstance(nom, str)
+            or nom not in POIDS_PAR_PATTERN
             or nom in motifs_vus
             or not isinstance(poids, int)
             or isinstance(poids, bool)
@@ -79,9 +92,25 @@ def _valider_faits(faits: FaitsAlerte) -> None:
             raise ValueError("Motif ou poids non autorisé")
         motifs_vus.add(nom)
 
+    if not isinstance(faits.autres_faits, (tuple, list)) or not all(
+        isinstance(fait, str) for fait in faits.autres_faits
+    ):
+        raise ValueError("Autres faits invalides")
+
     debut, fin = faits.fenetre_debut, faits.fenetre_fin
+
+    for nom, valeur in (
+        ("fenetre_debut", debut),
+        ("fenetre_fin", fin),
+    ):
+        if valeur is not None and (
+            not isinstance(valeur, date)
+        ):
+            raise ValueError(f"{nom} invalide")
+
     if (debut is None) != (fin is None):
         raise ValueError("Fenêtre temporelle incomplète")
+
     if debut is not None and fin is not None and debut > fin:
         raise ValueError("Fenêtre temporelle incohérente")
 
@@ -243,6 +272,15 @@ async def expliquer_alerte(
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
 ) -> tuple[str, bool]:
     """Retourne (texte, repli_utilise), sans afficher de sortie libre du modèle."""
+    try:
+        _valider_faits(faits)
+    except (TypeError, ValueError):
+        return (
+            "Les données de cette alerte ne permettent pas de produire "
+            "une explication fiable. Une vérification des données est nécessaire.",
+            True,
+        )
+
     base_url = url or os.getenv(
         "SOUVERAIN_OLLAMA_URL", "http://127.0.0.1:11434"
     )
