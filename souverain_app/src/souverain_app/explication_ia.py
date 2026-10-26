@@ -99,14 +99,12 @@ def _valider_faits(faits: FaitsAlerte) -> None:
 
     debut, fin = faits.fenetre_debut, faits.fenetre_fin
 
-    for nom, valeur in (
+    for nom_borne, borne in (
         ("fenetre_debut", debut),
         ("fenetre_fin", fin),
     ):
-        if valeur is not None and (
-            not isinstance(valeur, date)
-        ):
-            raise ValueError(f"{nom} invalide")
+        if borne is not None and not isinstance(borne, date):
+            raise ValueError(f"{nom_borne} invalide")
 
     if (debut is None) != (fin is None):
         raise ValueError("Fenêtre temporelle incomplète")
@@ -281,10 +279,10 @@ async def expliquer_alerte(
             True,
         )
 
-    base_url = url or os.getenv(
+    base_url: str = url or os.environ.get(
         "SOUVERAIN_OLLAMA_URL", "http://127.0.0.1:11434"
     )
-    nom_modele = modele or os.getenv(
+    nom_modele: str = modele or os.environ.get(
         "SOUVERAIN_OLLAMA_MODEL", "ministral-3:8b-instruct-2512-q4_K_M"
     )
 
