@@ -41,14 +41,14 @@
     <p class="chargement">{{ t('alerte_detail.chargement_graphe', langue) }}</p>
 </div>
 
-<div id="explication-ia">
-    <button type="button"
-            hx-get="/alertes/{{ alerte.alerte_id }}/expliquer"
-            hx-target="#explication-ia"
-            hx-swap="innerHTML">
-        Expliquer cette alerte
-    </button>
-    <p class="aide">L’explication est produite localement à partir des faits enregistrés.</p>
+{# Point d'intégration étape 6b (explication IA locale, ADR-007) : bloc
+   sans aucun texte. Le bouton et ses libellés sont servis par le fragment
+   /alertes/{id}/explication, avec son propre mécanisme t() (ADR-001). #}
+<div id="explication-ia"
+     hx-get="/alertes/{{ alerte.alerte_id }}/explication"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+    <p class="chargement">…</p>
 </div>
 
 {# Point d'intégration Brique 8 (Audit + Human-in-the-loop), ajout

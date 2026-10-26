@@ -1,4 +1,13 @@
-"""Route d'explication locale d'une alerte — étape 6B."""
+"""Routes d'explication locale d'une alerte — étape 6B (ADR-007).
+
+Deux routes :
+- GET /alertes/{id}/explication : fragment HTMX contenant le bouton, chargé
+  par la page de détail de la Brique 7 (qui ne contient aucun texte pour ce
+  bloc) ;
+- GET /alertes/{id}/expliquer : produit l'explication, à la demande.
+
+Aucun texte utilisateur n'est écrit en dur : tout passe par t() (ADR-001).
+"""
 from __future__ import annotations
 
 from html import escape
@@ -10,12 +19,34 @@ from brique_05_scoring_alertes.seuils import POIDS_PAR_PATTERN, SEUIL_ALERTE
 from brique_07_dashboard import lecture
 from brique_07_dashboard.auth_cookie import get_current_user_from_cookie
 from brique_07_dashboard.tenant_garde import MetadonneesTenant, tenant_valide
+from brique_07_dashboard.traductions import langue_pour_pays
 from fastapi import APIRouter, Depends, HTTPException
 from starlette.responses import HTMLResponse
 
 from souverain_app.explication_ia import FaitsAlerte, expliquer_alerte
+from souverain_app.traductions import t
 
 router = APIRouter(tags=["explication-ia"])
+
+
+@router.get("/alertes/{alerte_id}/explication", response_class=HTMLResponse)
+async def fragment_explication_route(
+    alerte_id: UUID,
+    tenant: MetadonneesTenant = Depends(tenant_valide),  # noqa: B008
+    utilisateur: AuthenticatedUser = Depends(get_current_user_from_cookie),  # noqa: B008
+) -> HTMLResponse:
+    """Retourne le bouton d'explication, sans accès à la base ni au modèle."""
+    del utilisateur  # L'identité protège la route ; elle n'est pas utilisée ici.
+
+    langue = langue_pour_pays(tenant.country_code)
+    return HTMLResponse(
+        content=(
+            f'<button type="button" hx-get="/alertes/{alerte_id}/expliquer" '
+            'hx-target="#explication-ia" hx-swap="innerHTML">'
+            f"{escape(t('explication.bouton', langue))}</button>"
+            f'<p class="aide">{escape(t("explication.aide", langue))}</p>'
+        )
+    )
 
 
 @router.get("/alertes/{alerte_id}/expliquer", response_class=HTMLResponse)
@@ -58,21 +89,19 @@ async def expliquer_alerte_route(
     )
 
     texte, repli_utilise = await expliquer_alerte(faits)
-    texte_sain = escape(texte)
-    origine = (
-        "Explication de repli déterministe (modèle indisponible ou réponse rejetée)."
-        if repli_utilise
-        else "Explication générée localement par le modèle."
+    langue = langue_pour_pays(tenant.country_code)
+    cle_origine = (
+        "explication.origine_repli" if repli_utilise else "explication.origine_modele"
     )
+    origine = t(cle_origine, langue)
 
     return HTMLResponse(
         content=(
             '<section class="explication-ia" aria-live="polite">'
-            "<h2>Explication de l’alerte</h2>"
-            f"<p>{texte_sain}</p>"
-            f"<p class=\"avertissement\">{escape(origine)} "
-            "Cette explication est indicative : elle ne constitue ni un verdict "
-            "ni une recommandation d’action. Les seuils et poids actuels sont provisoires.</p>"
+            f"<h2>{escape(t('explication.titre', langue))}</h2>"
+            f"<p>{escape(texte)}</p>"
+            f'<p class="avertissement">{escape(origine)} '
+            f"{escape(t('explication.avertissement', langue))}</p>"
             "</section>"
         )
     )
