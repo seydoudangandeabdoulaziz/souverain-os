@@ -3,10 +3,12 @@
 Garde-fou contre le retour de textes français écrits en dur dans la route
 d'explication et dans le bloc d'explication du template de la Brique 7.
 """
+
 from __future__ import annotations
 
 import ast
 import re
+from datetime import date
 from pathlib import Path
 from uuid import uuid4
 
@@ -16,15 +18,16 @@ from brique_02_auth_rbac.session import AuthenticatedUser
 from brique_07_dashboard.tenant_garde import MetadonneesTenant
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from souverain_app.traductions import t
+from souverain_app.traductions import _DICTIONNAIRES, t
 from souverain_app.traductions.fr import TEXTES_FR
 
+from souverain_app import explication_ia as ia
 from souverain_app import explication_routes as routes
 
 _FICHIER_ROUTES = Path(routes.__file__)
-_TEMPLATE_B7 = (
-    Path(brique_07_dashboard.__file__).parent / "templates" / "alerte_detail.html"
-)
+_FICHIER_IA = Path(ia.__file__)
+_FONCTIONS_TEXTE_IA = {"_construire_phrases", "construire_repli", "expliquer_alerte"}
+_TEMPLATE_B7 = Path(brique_07_dashboard.__file__).parent / "templates" / "alerte_detail.html"
 
 # Heuristique volontairement simple : un texte français contient soit une
 # lettre accentuée, soit un mot-outil courant entouré d'espaces.
@@ -32,14 +35,17 @@ _MOTS_OUTILS = (" le ", " la ", " de ", " des ", " ne ", " est ", " pas ", " à 
 _ACCENTS = re.compile(r"[àâäéèêëîïôöùûüçœ’]", re.IGNORECASE)
 
 
-def _constantes_texte(source: str) -> list[str]:
-    """Retourne les chaînes littérales hors docstrings."""
+def _constantes_texte(source: str, fonctions: set[str] | None = None) -> list[str]:
+    """Retourne les chaînes littérales hors docstrings.
+
+    Si `fonctions` est donné, seules les chaînes du corps de ces fonctions
+    sont retournées (utile pour `explication_ia.py`, dont le prompt et les
+    messages d'erreur internes ne sont pas des textes utilisateur).
+    """
     arbre = ast.parse(source)
     docstrings: set[int] = set()
     for noeud in ast.walk(arbre):
-        if isinstance(
-            noeud, ast.Module | ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef
-        ):
+        if isinstance(noeud, ast.Module | ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
             corps = noeud.body
             if (
                 corps
@@ -48,28 +54,44 @@ def _constantes_texte(source: str) -> list[str]:
                 and isinstance(corps[0].value.value, str)
             ):
                 docstrings.add(id(corps[0].value))
+
+    racines: list[ast.AST] = [arbre]
+    if fonctions is not None:
+        racines = [
+            n
+            for n in ast.walk(arbre)
+            if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef) and n.name in fonctions
+        ]
     return [
         n.value
-        for n in ast.walk(arbre)
-        if isinstance(n, ast.Constant)
-        and isinstance(n.value, str)
-        and id(n) not in docstrings
+        for racine in racines
+        for n in ast.walk(racine)
+        if isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in docstrings
     ]
+
+
+def _suspects(constantes: list[str]) -> list[str]:
+    return [c for c in constantes if _ACCENTS.search(c) or any(m in f" {c} " for m in _MOTS_OUTILS)]
 
 
 def test_aucun_texte_francais_en_dur_dans_les_routes() -> None:
-    suspects = [
-        c
-        for c in _constantes_texte(_FICHIER_ROUTES.read_text(encoding="utf-8"))
-        if _ACCENTS.search(c) or any(m in f" {c} " for m in _MOTS_OUTILS)
-    ]
+    suspects = _suspects(_constantes_texte(_FICHIER_ROUTES.read_text(encoding="utf-8")))
+    assert suspects == [], f"Textes en dur détectés : {suspects}"
+
+
+def test_aucun_texte_francais_en_dur_dans_les_phrases_du_serveur() -> None:
+    suspects = _suspects(
+        _constantes_texte(_FICHIER_IA.read_text(encoding="utf-8"), _FONCTIONS_TEXTE_IA)
+    )
     assert suspects == [], f"Textes en dur détectés : {suspects}"
 
 
 def test_toutes_les_cles_utilisees_existent_dans_le_dictionnaire() -> None:
-    source = _FICHIER_ROUTES.read_text(encoding="utf-8")
-    cles = set(re.findall(r"""t\(\s*['"]([a-z_.]+)['"]""", source))
-    cles |= {c for c in re.findall(r'"(explication\.[a-z_]+)"', source)}
+    cles: set[str] = set()
+    for fichier in (_FICHIER_ROUTES, _FICHIER_IA):
+        source = fichier.read_text(encoding="utf-8")
+        cles |= set(re.findall(r"""(?<![\w.])t\(\s*['"]([a-z_.]+)['"]""", source))
+        cles |= set(re.findall(r'"(explication\.[a-z_.]+)"', source))
     assert cles, "Aucune clé de traduction trouvée : test sans objet."
     manquantes = sorted(c for c in cles if c not in TEXTES_FR)
     assert manquantes == []
@@ -83,9 +105,7 @@ def test_cle_inconnue_ne_plante_pas() -> None:
 def test_bloc_explication_du_template_b7_ne_contient_aucun_texte() -> None:
     template = _TEMPLATE_B7.read_text(encoding="utf-8")
     template = re.sub(r"\{#.*?#\}", "", template, flags=re.DOTALL)
-    bloc = re.search(
-        r'<div id="explication-ia".*?</div>', template, flags=re.DOTALL
-    )
+    bloc = re.search(r'<div id="explication-ia".*?</div>', template, flags=re.DOTALL)
     assert bloc is not None
     sans_balises = re.sub(r"<[^>]+>", "", bloc.group(0)).strip()
     assert sans_balises == "…"
@@ -110,9 +130,7 @@ def app_fragment() -> FastAPI:
         souverain_id=uuid4(),
     )
     app.dependency_overrides[routes.tenant_valide] = lambda: tenant
-    app.dependency_overrides[routes.get_current_user_from_cookie] = (
-        lambda: utilisateur
-    )
+    app.dependency_overrides[routes.get_current_user_from_cookie] = lambda: utilisateur
     return app
 
 
@@ -152,3 +170,55 @@ async def test_fragment_exige_une_session() -> None:
 
     assert reponse.status_code == 303
     assert reponse.headers["location"] == "/login"
+
+
+def _faits_exemple() -> ia.FaitsAlerte:
+    return ia.FaitsAlerte(
+        compte_pivot="compte_test",
+        score=60,
+        seuil=50,
+        statut="ouverte",
+        motifs=(("compte_pivot", 30),),
+        nombre_transactions=None,
+        fenetre_debut=date(2026, 10, 1),
+        fenetre_fin=date(2026, 10, 8),
+    )
+
+
+def test_langue_factice_prouve_que_les_phrases_viennent_du_dictionnaire(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(_DICTIONNAIRES, "xx", {k: f"XX|{v}" for k, v in TEXTES_FR.items()})
+    phrases = ia._construire_phrases(_faits_exemple(), "xx")
+
+    assert phrases
+    assert all(p.startswith("XX|") for p in phrases.values())
+    assert ia.construire_repli(_faits_exemple(), "xx").startswith("XX|")
+
+
+def test_langue_inconnue_retombe_sur_le_francais() -> None:
+    assert ia.construire_repli(_faits_exemple(), "zz") == ia.construire_repli(
+        _faits_exemple(), "fr"
+    )
+
+
+@pytest.mark.asyncio
+async def test_message_donnees_invalides_est_externalise(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(_DICTIONNAIRES, "xx", {"explication.donnees_insuffisantes": "XX"})
+    invalide = ia.FaitsAlerte(
+        compte_pivot="c",
+        score=-1,
+        seuil=50,
+        statut="ouverte",
+        motifs=(),
+        nombre_transactions=None,
+    )
+
+    texte_fr, repli_fr = await ia.expliquer_alerte(invalide)
+    texte_xx, repli_xx = await ia.expliquer_alerte(invalide, langue="xx")
+
+    assert texte_fr == TEXTES_FR["explication.donnees_insuffisantes"]
+    assert texte_xx == "XX"
+    assert repli_fr is True and repli_xx is True

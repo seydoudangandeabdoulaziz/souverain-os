@@ -17,6 +17,8 @@ from urllib.request import Request, urlopen
 
 from brique_05_scoring_alertes.seuils import POIDS_PAR_PATTERN
 
+from souverain_app.traductions import t
+
 MAX_WORDS = 120
 DEFAULT_TIMEOUT_SECONDS = 120.0
 
@@ -132,52 +134,61 @@ def _identifiants_autorises(faits: FaitsAlerte) -> tuple[str, ...]:
     return tuple(identifiants)
 
 
-def _construire_phrases(faits: FaitsAlerte) -> dict[str, str]:
-    """Construit chaque phrase à partir des faits, jamais du texte du modèle."""
+def _construire_phrases(faits: FaitsAlerte, langue: str = "fr") -> dict[str, str]:
+    """Construit chaque phrase à partir des faits, jamais du texte du modèle.
+
+    Les textes viennent du dictionnaire de traductions (ADR-001, ADR-007).
+    """
     if faits.score < faits.seuil:
-        comparaison = "inférieur au seuil"
+        cle_comparaison = "explication.comparaison.inferieur"
     elif faits.score == faits.seuil:
-        comparaison = "égal au seuil"
+        cle_comparaison = "explication.comparaison.egal"
     else:
-        comparaison = "supérieur au seuil"
+        cle_comparaison = "explication.comparaison.superieur"
+    comparaison = t(cle_comparaison, langue)
 
     phrases = {
-        "compte": f"L'alerte concerne le compte {faits.compte_pivot}.",
-        "comparaison_score_seuil": (
-            f"Le score est de {faits.score}, {comparaison} de {faits.seuil}."
+        "compte": t("explication.phrase.compte", langue).format(
+            compte=faits.compte_pivot
         ),
-        "statut": f"Le statut enregistré est : {faits.statut}.",
+        "comparaison_score_seuil": t(
+            "explication.phrase.comparaison_score_seuil", langue
+        ).format(score=faits.score, comparaison=comparaison, seuil=faits.seuil),
+        "statut": t("explication.phrase.statut", langue).format(
+            statut=faits.statut
+        ),
     }
 
     if faits.fenetre_debut is not None and faits.fenetre_fin is not None:
-        phrases["fenetre"] = (
-            "Fenêtre enregistrée : "
-            f"{faits.fenetre_debut.isoformat()} au "
-            f"{faits.fenetre_fin.isoformat()}."
+        phrases["fenetre"] = t("explication.phrase.fenetre", langue).format(
+            debut=faits.fenetre_debut.isoformat(),
+            fin=faits.fenetre_fin.isoformat(),
         )
 
     if faits.motifs:
         details = ", ".join(
-            f"{nom} (poids {poids})" for nom, poids in faits.motifs
+            t("explication.motif_detail", langue).format(nom=nom, poids=poids)
+            for nom, poids in faits.motifs
         )
-        phrases["motifs"] = f"Motifs contributifs enregistrés : {details}."
+        phrases["motifs"] = t("explication.phrase.motifs", langue).format(
+            details=details
+        )
 
     if faits.nombre_transactions is None:
-        phrases["transactions_indisponibles"] = (
-            "Le nombre de transactions n'est pas disponible."
+        phrases["transactions_indisponibles"] = t(
+            "explication.phrase.transactions_indisponibles", langue
         )
     else:
-        phrases["transactions_disponibles"] = (
-            "Le nombre de transactions fourni est "
-            f"{faits.nombre_transactions}."
-        )
+        phrases["transactions_disponibles"] = t(
+            "explication.phrase.transactions_disponibles", langue
+        ).format(nombre=faits.nombre_transactions)
 
     return phrases
 
 
-def construire_repli(faits: FaitsAlerte) -> str:
+def construire_repli(faits: FaitsAlerte, langue: str = "fr") -> str:
     """Produit une explication déterministe sans dépendre du modèle."""
-    phrases = _construire_phrases(faits)
+    phrases = _construire_phrases(faits, langue)
     ordre = _identifiants_autorises(faits)
     return " ".join(phrases[identifiant] for identifiant in ordre)
 
@@ -265,6 +276,7 @@ def _requete_ollama_sync(
 async def expliquer_alerte(
     faits: FaitsAlerte,
     *,
+    langue: str = "fr",
     url: str | None = None,
     modele: str | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
@@ -273,11 +285,7 @@ async def expliquer_alerte(
     try:
         _valider_faits(faits)
     except (TypeError, ValueError):
-        return (
-            "Les données de cette alerte ne permettent pas de produire "
-            "une explication fiable. Une vérification des données est nécessaire.",
-            True,
-        )
+        return t("explication.donnees_insuffisantes", langue), True
 
     base_url: str = url or os.environ.get(
         "SOUVERAIN_OLLAMA_URL", "http://127.0.0.1:11434"
@@ -296,7 +304,7 @@ async def expliquer_alerte(
         selection = _valider_selection(contenu, faits)
 
         if selection is not None:
-            phrases = _construire_phrases(faits)
+            phrases = _construire_phrases(faits, langue)
             texte = " ".join(phrases[identifiant] for identifiant in selection)
             if len(texte.split()) <= MAX_WORDS:
                 return texte, False
@@ -304,4 +312,4 @@ async def expliquer_alerte(
         # Ne pas exposer les détails techniques à l'utilisateur.
         pass
 
-    return construire_repli(faits), True
+    return construire_repli(faits, langue), True

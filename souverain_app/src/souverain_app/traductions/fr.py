@@ -1,7 +1,7 @@
 """Textes français de l'explication IA (étape 6b, ADR-007).
 
 Les textes sont identiques à ceux qui étaient auparavant écrits en dur dans
-`explication_routes.py` : aucun changement de wording, seulement un
+`explication_routes.py` et `explication_ia.py` : aucun changement de wording, seulement un
 déplacement vers ce dictionnaire.
 """
 
@@ -22,5 +22,26 @@ TEXTES_FR: dict[str, str] = {
         "Cette explication est indicative : elle ne constitue ni un verdict "
         "ni une recommandation d’action. "
         "Les seuils et poids actuels sont provisoires."
+    ),
+    "explication.comparaison.inferieur": "inférieur au seuil",
+    "explication.comparaison.egal": "égal au seuil",
+    "explication.comparaison.superieur": "supérieur au seuil",
+    "explication.phrase.compte": "L'alerte concerne le compte {compte}.",
+    "explication.phrase.comparaison_score_seuil": (
+        "Le score est de {score}, {comparaison} de {seuil}."
+    ),
+    "explication.phrase.statut": "Le statut enregistré est : {statut}.",
+    "explication.phrase.fenetre": "Fenêtre enregistrée : {debut} au {fin}.",
+    "explication.phrase.motifs": "Motifs contributifs enregistrés : {details}.",
+    "explication.motif_detail": "{nom} (poids {poids})",
+    "explication.phrase.transactions_indisponibles": (
+        "Le nombre de transactions n'est pas disponible."
+    ),
+    "explication.phrase.transactions_disponibles": (
+        "Le nombre de transactions fourni est {nombre}."
+    ),
+    "explication.donnees_insuffisantes": (
+        "Les données de cette alerte ne permettent pas de produire "
+        "une explication fiable. Une vérification des données est nécessaire."
     ),
 }
