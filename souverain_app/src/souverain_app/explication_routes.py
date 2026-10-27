@@ -89,7 +89,9 @@ async def expliquer_alerte_route(
     )
 
     langue = langue_pour_pays(tenant.country_code)
-    texte, repli_utilise = await expliquer_alerte(faits, langue=langue)
+    texte, repli_utilise = await expliquer_alerte(
+        faits, langue=langue, alerte_id=alerte_id
+    )
     cle_origine = (
         "explication.origine_repli" if repli_utilise else "explication.origine_modele"
     )
