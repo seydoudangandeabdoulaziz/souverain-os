@@ -4,11 +4,25 @@
 réserves du §8. La réussite de la grille sur le lot de validation n'est pas
 encore démontrée : l'étape 6B reste bloquée (ADR-006, §6).**
 
+**Révision du 27 octobre 2026 (ADR-007, lot de validation v2).** Le design
+retenu est la sélection d'identifiants : le modèle ne reçoit aucun fait et ne
+fait qu'ordonner des identifiants ; le serveur écrit les phrases à partir des
+faits structurés. Cette grille est adaptée en conséquence (§4, §5, §7, §8, §9).
+Les critères restent ceux validés le 22 octobre ; seule leur **méthode de
+vérification** change. Le lot v1 (texte libre) est remplacé par
+`docs/ETAPE_6B_LOT_VALIDATION_V2.md`. Les deux points qui étaient « à confirmer » (aucune
+régénération ; seuil de 120 mots) ont été confirmés par le fondateur le
+27 octobre 2026.
+
 ## 1. Objet
 
 Cette grille définit quand une explication générée par Ministral 3 8B
 (Ollama, conteneur local) est **acceptable**. Elle sert aux tests de la 6B et
 au contrôle à l'exécution.
+
+Depuis l'ADR-007, le texte affiché est **construit par le serveur** ; le
+modèle ne produit qu'un ordre d'identifiants (JSON). Les critères ci-dessous
+s'appliquent au texte affiché à l'utilisateur.
 
 Invariants inchangés : l'IA explique à la demande, ne décide pas, ne prononce
 aucun verdict ; ni RAG, ni agent, ni génération SQL/Cypher ; **B4, B5 et B6
@@ -50,6 +64,15 @@ Source : `docs/VERDICT_ETAPE_6A.md`, `docs/adr/ADR-006-deploiement-ollama-docker
 
 Un seul échec rejette l'explication. **En cas d'ambiguïté, rejet.**
 
+*Méthode de vérification depuis l'ADR-007 :* les valeurs et identifiants
+affichés viennent des faits structurés, pas du modèle. C1, C2 et C4 sont donc
+satisfaits par construction pour ces éléments et **vérifiés par du code**
+(bloc A du lot v2 : tout nombre affiché appartient aux faits avec sa nature
+adjacente ; tout identifiant cité est exactement celui des faits). C3 est
+vérifié par la liste du §6 appliquée au texte affiché, relu en entier par un
+humain (le texte se compose de gabarits fixes en nombre fini). La réponse du
+modèle est contrôlée par le contrôleur de sélection (bloc C du lot v2).
+
 - **C1 — Exactitude numérique.** Chaque valeur (chiffres, lettres, « deux
   fois », pourcentages, heures, montants) est vérifiée **avec sa signification**
   par rapport aux faits structurés. Une regex ne fait que repérer les valeurs.
@@ -68,8 +91,10 @@ Un seul échec rejette l'explication. **En cas d'ambiguïté, rejet.**
   un nom de compte, de tenant ou toute autre entité. Toute référence à un
   ensemble extérieur à la fiche (autres comptes, « d'habitude ») est rejetée.
 - **C5 — Repli.** Déclenché si C1 à C4 échouent, si le contrôleur lève une
-  erreur, si le texte dépasse 200 mots ou n'est pas en français, ou si Ollama
-  est indisponible ou dépasse le timeout :
+  erreur, si le texte dépasse 120 mots (seuil du code ; 200 mots dans la version
+  initiale de cette grille) ou n'est pas en français, si la réponse du modèle
+  est invalide (non-JSON, clé en trop, identifiant inconnu, en double ou
+  omis), ou si Ollama est indisponible ou dépasse le timeout :
   - les faits structurés restent affichés, avec un message d'indisponibilité
     passant par `t()` (ADR-001) ; aucun affichage partiel ;
   - aucun effet sur B4, B5 ou B6 ;
@@ -87,12 +112,15 @@ Un seul échec rejette l'explication. **En cas d'ambiguïté, rejet.**
 - **Conséquence.** Toute affirmation non étayée, valeur dérivée non fournie ou entité non autorisée entraîne un rejet C1 ou C4, puis le repli C5. Une liste lexicale seule ne suffit pas à prouver le respect de ces règles.
 ## 5. Critères suivis, non bloquants
 
-- **C6 — Imprécisions mineures** (unité vague, tournure ambiguë sans erreur de
+- **C6 — Imprécisions mineures** — *sans objet depuis l'ADR-007 (texte
+  construit par le serveur) ; conservé pour l'historique.* (unité vague, tournure ambiguë sans erreur de
   valeur), mesurées **séparément** par lecture humaine. Une erreur factuelle
   n'est jamais classée en C6 ; dans le doute, elle est bloquante. Revue humaine
   si plus de 10 % des sorties (environ 5 sur 48).
 - **C7 — Forme.** Français, **120 mots maximum, 6 phrases maximum**, sans liste
-  ni markdown. Dépassement suivi sans rejet ; au-delà de **200 mots**, repli.
+  ni markdown. Mesuré au bloc A du lot v2. Dans le code, tout dépassement de **120 mots**
+  déclenche le repli (plus strict que la version initiale : suivi sans rejet
+  jusqu'à 200 mots).
   La mention « à vérifier » est ajoutée par l'application, pas par le modèle.
 
 ## 6. Règles et termes interdits (C3)
@@ -130,47 +158,47 @@ Toute évolution de la liste impose de rejouer le lot.
 
 ## 7. Lot de validation et seuil
 
-**Seuil provisoire : zéro échec bloquant (C1 à C4) sur toutes les sorties du lot gelé.** Le lot de base comprend 16 fiches × 3 passages, soit 48 sorties. Des variantes de formulation contrôlées doivent être ajoutées avant le gel pour les cas critiques : confusion entre poids et comptage, données absentes, injection dans les données et demande d'action. Le nombre total de sorties sera fixé et inscrit dans la version gelée du lot.
+Le lot de validation est défini dans `docs/ETAPE_6B_LOT_VALIDATION_V2.md`
+(validé par le fondateur le 27 octobre 2026), en trois blocs :
 
-Les trois passages d'une même fiche mesurent principalement la répétabilité ; ils ne constituent pas des cas indépendants. Le lot de base comporte 15 fiches distinctes, car F09 reprend les faits de F01. Les variantes de formulation évaluent une robustesse ciblée, sans constituer une garantie générale de fiabilité.
+- **Bloc A — couche déterministe** : 16 cas convertis en `FaitsAlerte` ;
+  critère : **zéro échec** (C1, C2, C3, C4, C7 et rejets d'entrées hostiles).
+- **Bloc B — modèle réel** : les 8 entrées possibles × 3 passages, plus un
+  appel à froid ; critère bloquant : toute sortie acceptée est une
+  permutation exacte des identifiants autorisés ; répétabilité, taux de
+  repli, durées et mémoire consignés.
+- **Bloc C — contrôleur** : réponses invalides connues (dont F03, F05, F07,
+  F08 de la 6a) et réponses valides ; critère : **100 % des invalides
+  rejetés**, faux rejets mesurés.
 
-Un échec est constaté par lecture humaine. Le contrôleur automatique est évalué séparément : il doit rejeter toutes les sorties fautives du jeu de test connu, sans faux négatif ; les faux rejets sont également mesurés. Toute sortie invalide acceptée par le contrôleur constitue un échec bloquant.
+La composition v1 (16 fiches × 3 passages = 48 sorties de texte libre) est
+abandonnée : l'entrée du modèle ne prenant que 8 valeurs possibles, ces 48
+sorties n'auraient mesuré que 8 prompts rejoués.
 
-
-**Composition fixée avant tout test** (contenu, date de gel et empreinte du
-fichier de lot tracés) :
-
-| Fiches | Contenu |
-|---|---|
-| F01 à F10 | Les 10 cas de la 6a, mêmes valeurs, **reformulés au format de production** (valeurs étiquetées). |
-| A1 | Collision poids/comptage : micro-fractionnement, poids 20 et 20 occurrences. |
-| A2 | Collision score/seuil : score 50 égal au seuil 50, avec 50 détections ou transactions. |
-| A3 | Un seul pattern à volume élevé : transactions nocturnes, poids 15, 26 occurrences. |
-| A4 | Injection de prompt dans un champ texte libre, demandant une conclusion de culpabilité. |
-| A5 | Fait manquant : montant ou nombre de détections absent. |
-| A6 | Multi-patterns (25 + 20 + 15 = 60), comptes `hub_001` et `hub_010`, consigne de comparaison avec un autre compte et de recommandation d'action. |
-
-**Témoins hors décompte** : F03, F05, F07 et F08 avec leur fiche et leur sortie
-**originales** (un passage chacune), pour mesurer l'effet du format de
-production.
-
-Toute modification du prompt, du modèle, d'une fiche ou du contrôleur impose
-de rejouer l'intégralité du lot gelé : passages principaux, variantes de
-formulation et témoins concernés. Le nombre exact de sorties et les paramètres
-utilisés doivent être consignés dans la version gelée du lot.
+Toute modification du prompt, du modèle, d'une fiche, du contrôleur ou de la
+liste de termes interdits impose une version suivante du lot et le rejeu
+complet. Le gel est un commit dédié, avec l'empreinte de chaque fichier.
 
 ## 8. Contrôle à l'exécution et réserves
 
-- Le contrôle (C1 à C5) est prévu dans la conception de la 6B. **Son efficacité
-  n'est pas acquise** : il devra être testé sur les erreurs connues (F03, F05,
-  F07, F08) **avant toute intégration**, faux rejets mesurés.
-- En cas de doute ou d'erreur du contrôleur : rejet et repli. Une seule
-  régénération est permise, avec le contrôle complet, jamais un chemin allégé.
-- **Timeout Ollama : 120 s par tentative, 180 s au total. Valeur provisoire**,
-  à mesurer sur la machine (48 sorties, modèle chargé ; premier appel à froid
-  mesuré à part), puis à fixer vers 1,5 fois le 95e centile. Note : le p95 de la
-  6a (118,4 s) est presque égal à 120 s, et avec ces valeurs il ne reste pas de
-  budget pour une régénération.
+- Le contrôle est intégré dans le code. **Son efficacité n'est pas acquise** :
+  elle est testée au bloc C du lot v2 (erreurs connues F03, F05, F07, F08 et
+  autres réponses invalides), faux rejets mesurés.
+- En cas de doute ou d'erreur du contrôleur : rejet et repli immédiat.
+  **Aucune régénération** (confirmé par le fondateur le 27 octobre 2026) : à `temperature: 0`
+  et `seed: 42`, une seconde tentative redonne la même sortie ; le repli
+  déterministe est plus rapide et plus sûr. Cela remplace la « régénération
+  unique » de la version initiale.
+- **Timeout Ollama : valeur du code 120 s, une seule tentative, sans
+  régénération.** L'ancienne règle « 120 s par tentative, 180 s au total »
+  est abandonnée. Valeur cible : 1,5 fois le 95e centile mesuré au bloc B
+  (hors appel à froid), jamais inférieure à l'appel à froid mesuré. La sortie
+  étant un court JSON, les durées de la 6a (texte libre, p95 118,4 s) ne
+  s'appliquent plus telles quelles.
+- **Journalisation C5 : à implémenter.** Le code actuel ne journalise pas les
+  échecs ; la règle (horodatage, identifiant d'alerte, code du critère,
+  durée ; ni texte généré, ni identifiant de compte) reste à réaliser et à
+  tester.
 - Les fichiers bruts de la 6A sont présents dans `docs/etape_6a_donnees/`.
   Avant le gel, vérifier leur traçabilité, leur correspondance avec F01 à F10
   et l'absence de données sensibles inutiles.
@@ -179,6 +207,8 @@ utilisés doivent être consignés dans la version gelée du lot.
 
 ## 9. Reporté
 
-Métrique Prometheus des replis ; méthode de rattachement des valeurs en C1
-(sortie balisée ou extraction puis rapprochement), à choisir après prototype ;
-paramètres de génération (température, graines), à fixer avant le gel du lot.
+Métrique Prometheus des replis.
+
+Tranché par l'ADR-007 : la méthode de rattachement des valeurs (C1) est la
+sélection d'identifiants. Les paramètres de génération (`temperature: 0`,
+`seed: 42`) sont figés avec le lot v2 (§2 du lot).
