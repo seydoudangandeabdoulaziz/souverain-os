@@ -1,0 +1,27 @@
+{
+  "version_lot": "v2",
+  "date_gel": "2026-10-28T10:11:12+00:00",
+  "commit": "b647d4eb497dd4161cacfdc9fefb023858b2401d",
+  "arbre_de_travail_propre": true,
+  "modele_nom": "ministral-3:8b-instruct-2512-q4_K_M",
+  "image_ollama_compose": "ollama/ollama@sha256:292ee7945dfc3d5840a181f3ab86fedb1e66703e02c8af98b50f4da56b7e278c",
+  "modele_digest_complet": "1922accd5827ebe6829e536369195db25eaf664528dc66206d646ea3bb386b71",
+  "prompt_systeme_sha256": "52430bc8267992dec1ba14fb61c7b404da51e98ad72dde6dafe971c18d55b49c",
+  "options": {
+    "temperature": 0,
+    "seed": 42
+  },
+  "format": "json",
+  "stream": false,
+  "controleur_sha256": "68b29a9c86b3abde015ec0caf24167a2fc812531399df4347e5d7d3eb4ebb700",
+  "traductions_fr_sha256": "88e99af3b2ce89e521f2ca761e8e3464d816480ce06e69b675347f3e4ae34097",
+  "max_words": 120,
+  "timeout_code_secondes": 120.0,
+  "timeout_variable": "SOUVERAIN_OLLAMA_TIMEOUT",
+  "timeout_min_s": 5.0,
+  "timeout_max_s": 300.0,
+  "fichiers_lot": {
+    "lot_v2.json": "2cd74aab22d619481fca482041388c3223d75afd8863a03f09b0d23908e08e5a",
+    "termes_interdits_v1.json": "55a3a3f982002a3f51faed6ead3f210e56def25d2d49f487fef6ebb8db4454e7"
+  }
+}
