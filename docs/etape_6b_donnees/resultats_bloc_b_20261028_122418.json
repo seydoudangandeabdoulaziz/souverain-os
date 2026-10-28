@@ -1,0 +1,567 @@
+{
+  "gel": "gel_v2.json",
+  "date": "2026-10-28T12:24:18+00:00",
+  "commit": "0ab10015c92f0e1679128a04d2db84601c9f4111",
+  "timeout_utilise_s": 120.0,
+  "releves_api_ps": {
+    "apres_premier_appel": {
+      "horodatage": "2026-10-28T12:20:27+00:00",
+      "disponible": true,
+      "context_length": 4096,
+      "keep_alive_effectif_approx_s": 300,
+      "expires_at": "2026-10-28T12:25:27.029350909Z",
+      "size_octets": 5953898412,
+      "size_vram_octets": 0,
+      "digest": "1922accd5827ebe6829e536369195db25eaf664528dc66206d646ea3bb386b71"
+    },
+    "fin_campagne": {
+      "horodatage": "2026-10-28T12:24:17+00:00",
+      "disponible": true,
+      "context_length": 4096,
+      "keep_alive_effectif_approx_s": 300,
+      "expires_at": "2026-10-28T12:29:17.701649328Z",
+      "size_octets": 5953898412,
+      "size_vram_octets": 0,
+      "digest": "1922accd5827ebe6829e536369195db25eaf664528dc66206d646ea3bb386b71"
+    }
+  },
+  "synthese": {
+    "appels_chauds": 24,
+    "bloquant_acceptee_non_conforme": 0,
+    "taux_repli_global": 0.0,
+    "erreurs": [],
+    "duree_froid_s": 47.588,
+    "duree_mediane_s": 9.325,
+    "duree_p95_s": 11.57,
+    "timeout_cible_s": 47.6,
+    "pic_memoire_conteneur_gio": 6.284,
+    "par_entree": {
+      "B1": {
+        "appels": 3,
+        "repetable": true,
+        "taux_repli": 0.0,
+        "duree_mediane_s": 8.107
+      },
+      "B2": {
+        "appels": 3,
+        "repetable": true,
+        "taux_repli": 0.0,
+        "duree_mediane_s": 7.817
+      },
+      "B3": {
+        "appels": 3,
+        "repetable": true,
+        "taux_repli": 0.0,
+        "duree_mediane_s": 9.538
+      },
+      "B4": {
+        "appels": 3,
+        "repetable": true,
+        "taux_repli": 0.0,
+        "duree_mediane_s": 9.286
+      },
+      "B5": {
+        "appels": 3,
+        "repetable": true,
+        "taux_repli": 0.0,
+        "duree_mediane_s": 9.325
+      },
+      "B6": {
+        "appels": 3,
+        "repetable": true,
+        "taux_repli": 0.0,
+        "duree_mediane_s": 8.992
+      },
+      "B7": {
+        "appels": 3,
+        "repetable": false,
+        "taux_repli": 0.0,
+        "duree_mediane_s": 10.718
+      },
+      "B8": {
+        "appels": 3,
+        "repetable": true,
+        "taux_repli": 0.0,
+        "duree_mediane_s": 10.428
+      }
+    }
+  },
+  "appels": [
+    {
+      "entree": "froid",
+      "source": "B7",
+      "passage": 1,
+      "duree_s": 47.588,
+      "reponse_brute": "{\"claims\":[\"fenetre\", \"statut\", \"motifs\", \"transactions_indisponibles\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "fenetre",
+        "statut",
+        "motifs",
+        "transactions_indisponibles",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B1",
+      "source": "B1",
+      "passage": 1,
+      "duree_s": 9.032,
+      "reponse_brute": "{\"claims\":[\"statut\", \"transactions_indisponibles\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "statut",
+        "transactions_indisponibles",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B1",
+      "source": "B1",
+      "passage": 2,
+      "duree_s": 8.107,
+      "reponse_brute": "{\"claims\":[\"statut\", \"transactions_indisponibles\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "statut",
+        "transactions_indisponibles",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B1",
+      "source": "B1",
+      "passage": 3,
+      "duree_s": 8.092,
+      "reponse_brute": "{\"claims\":[\"statut\", \"transactions_indisponibles\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "statut",
+        "transactions_indisponibles",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B2",
+      "source": "B2",
+      "passage": 1,
+      "duree_s": 8.473,
+      "reponse_brute": "{\"claims\":[\"statut\", \"transactions_disponibles\", \"compte\", \"comparaison_score_seuil\"]}",
+      "erreur": null,
+      "selection": [
+        "statut",
+        "transactions_disponibles",
+        "compte",
+        "comparaison_score_seuil"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B2",
+      "source": "B2",
+      "passage": 2,
+      "duree_s": 7.811,
+      "reponse_brute": "{\"claims\":[\"statut\", \"transactions_disponibles\", \"compte\", \"comparaison_score_seuil\"]}",
+      "erreur": null,
+      "selection": [
+        "statut",
+        "transactions_disponibles",
+        "compte",
+        "comparaison_score_seuil"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B2",
+      "source": "B2",
+      "passage": 3,
+      "duree_s": 7.817,
+      "reponse_brute": "{\"claims\":[\"statut\", \"transactions_disponibles\", \"compte\", \"comparaison_score_seuil\"]}",
+      "erreur": null,
+      "selection": [
+        "statut",
+        "transactions_disponibles",
+        "compte",
+        "comparaison_score_seuil"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B3",
+      "source": "B3",
+      "passage": 1,
+      "duree_s": 10.848,
+      "reponse_brute": "{\"claims\":[\"fenetre\", \"statut\", \"transactions_indisponibles\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "fenetre",
+        "statut",
+        "transactions_indisponibles",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B3",
+      "source": "B3",
+      "passage": 2,
+      "duree_s": 9.538,
+      "reponse_brute": "{\"claims\":[\"fenetre\", \"statut\", \"transactions_indisponibles\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "fenetre",
+        "statut",
+        "transactions_indisponibles",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B3",
+      "source": "B3",
+      "passage": 3,
+      "duree_s": 9.538,
+      "reponse_brute": "{\"claims\":[\"fenetre\", \"statut\", \"transactions_indisponibles\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "fenetre",
+        "statut",
+        "transactions_indisponibles",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B4",
+      "source": "B4",
+      "passage": 1,
+      "duree_s": 10.394,
+      "reponse_brute": "{\"claims\":[\"fenetre\", \"statut\", \"transactions_disponibles\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "fenetre",
+        "statut",
+        "transactions_disponibles",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B4",
+      "source": "B4",
+      "passage": 2,
+      "duree_s": 9.223,
+      "reponse_brute": "{\"claims\":[\"fenetre\", \"statut\", \"transactions_disponibles\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "fenetre",
+        "statut",
+        "transactions_disponibles",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B4",
+      "source": "B4",
+      "passage": 3,
+      "duree_s": 9.286,
+      "reponse_brute": "{\"claims\":[\"fenetre\", \"statut\", \"transactions_disponibles\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "fenetre",
+        "statut",
+        "transactions_disponibles",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B5",
+      "source": "B5",
+      "passage": 1,
+      "duree_s": 10.519,
+      "reponse_brute": "{\"claims\":[\"statut\", \"motifs\", \"transactions_indisponibles\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "statut",
+        "motifs",
+        "transactions_indisponibles",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B5",
+      "source": "B5",
+      "passage": 2,
+      "duree_s": 9.253,
+      "reponse_brute": "{\"claims\":[\"statut\", \"motifs\", \"transactions_indisponibles\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "statut",
+        "motifs",
+        "transactions_indisponibles",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B5",
+      "source": "B5",
+      "passage": 3,
+      "duree_s": 9.325,
+      "reponse_brute": "{\"claims\":[\"statut\", \"motifs\", \"transactions_indisponibles\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "statut",
+        "motifs",
+        "transactions_indisponibles",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B6",
+      "source": "B6",
+      "passage": 1,
+      "duree_s": 9.642,
+      "reponse_brute": "{\"claims\":[\"statut\", \"transactions_disponibles\", \"motifs\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "statut",
+        "transactions_disponibles",
+        "motifs",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B6",
+      "source": "B6",
+      "passage": 2,
+      "duree_s": 8.942,
+      "reponse_brute": "{\"claims\":[\"statut\", \"transactions_disponibles\", \"motifs\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "statut",
+        "transactions_disponibles",
+        "motifs",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B6",
+      "source": "B6",
+      "passage": 3,
+      "duree_s": 8.992,
+      "reponse_brute": "{\"claims\":[\"statut\", \"transactions_disponibles\", \"motifs\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "statut",
+        "transactions_disponibles",
+        "motifs",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B7",
+      "source": "B7",
+      "passage": 1,
+      "duree_s": 11.996,
+      "reponse_brute": "{\"claims\":[\"fenetre\", \"statut\", \"motifs\", \"transactions_indisponibles\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "fenetre",
+        "statut",
+        "motifs",
+        "transactions_indisponibles",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B7",
+      "source": "B7",
+      "passage": 2,
+      "duree_s": 10.698,
+      "reponse_brute": "{\"claims\":[\"fenetre\", \"statut\", \"transactions_indisponibles\", \"motifs\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "fenetre",
+        "statut",
+        "transactions_indisponibles",
+        "motifs",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B7",
+      "source": "B7",
+      "passage": 3,
+      "duree_s": 10.718,
+      "reponse_brute": "{\"claims\":[\"fenetre\", \"statut\", \"transactions_indisponibles\", \"motifs\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "fenetre",
+        "statut",
+        "transactions_indisponibles",
+        "motifs",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B8",
+      "source": "B8",
+      "passage": 1,
+      "duree_s": 11.57,
+      "reponse_brute": "{\"claims\":[\"fenetre\", \"statut\", \"transactions_disponibles\", \"motifs\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "fenetre",
+        "statut",
+        "transactions_disponibles",
+        "motifs",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B8",
+      "source": "B8",
+      "passage": 2,
+      "duree_s": 10.428,
+      "reponse_brute": "{\"claims\":[\"fenetre\", \"statut\", \"transactions_disponibles\", \"motifs\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "fenetre",
+        "statut",
+        "transactions_disponibles",
+        "motifs",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    },
+    {
+      "entree": "B8",
+      "source": "B8",
+      "passage": 3,
+      "duree_s": 10.424,
+      "reponse_brute": "{\"claims\":[\"fenetre\", \"statut\", \"transactions_disponibles\", \"motifs\", \"comparaison_score_seuil\", \"compte\"]}",
+      "erreur": null,
+      "selection": [
+        "fenetre",
+        "statut",
+        "transactions_disponibles",
+        "motifs",
+        "comparaison_score_seuil",
+        "compte"
+      ],
+      "acceptee": true,
+      "permutation_exacte": true,
+      "acceptee_non_conforme": false,
+      "repli": false
+    }
+  ]
+}
