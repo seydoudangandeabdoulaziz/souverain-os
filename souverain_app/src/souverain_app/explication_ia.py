@@ -14,6 +14,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import math
 import os
 import re
 from dataclasses import dataclass
@@ -30,6 +31,12 @@ from souverain_app.traductions import t
 
 MAX_WORDS = 120
 DEFAULT_TIMEOUT_SECONDS = 120.0
+
+# Timeout réglable par l'exploitation sans modifier le code (ADR-007) : valeur
+# retenue après mesure, bornée. Absente, invalide ou hors bornes : 120 s.
+TIMEOUT_ENV_VAR = "SOUVERAIN_OLLAMA_TIMEOUT"
+MIN_TIMEOUT_SECONDS = 5.0
+MAX_TIMEOUT_SECONDS = 300.0
 
 CauseRepli = Literal[
     "faits_invalides",
@@ -308,6 +315,28 @@ def _requete_ollama_sync(
     return contenu.strip()
 
 
+def timeout_configure() -> float:
+    """Timeout Ollama effectif, lu à chaque appel dans SOUVERAIN_OLLAMA_TIMEOUT.
+
+    Retourne la valeur de la variable si c'est un nombre fini compris entre
+    MIN_TIMEOUT_SECONDS et MAX_TIMEOUT_SECONDS (bornes incluses). Dans tous les
+    autres cas (absente, vide, non numérique, NaN, infinie, hors bornes), retourne
+    DEFAULT_TIMEOUT_SECONDS. La valeur brute n'est jamais journalisée.
+    """
+    brut = os.environ.get(TIMEOUT_ENV_VAR)
+    if brut is None:
+        return DEFAULT_TIMEOUT_SECONDS
+    try:
+        valeur = float(brut.strip())
+    except ValueError:
+        return DEFAULT_TIMEOUT_SECONDS
+    if not math.isfinite(valeur):
+        return DEFAULT_TIMEOUT_SECONDS
+    if not MIN_TIMEOUT_SECONDS <= valeur <= MAX_TIMEOUT_SECONDS:
+        return DEFAULT_TIMEOUT_SECONDS
+    return valeur
+
+
 def _est_delai_depasse(exc: BaseException) -> bool:
     """Reconnaît un dépassement de délai, côté asyncio comme côté socket."""
     if isinstance(exc, TimeoutError):
@@ -347,12 +376,13 @@ async def expliquer_alerte(
     langue: str = "fr",
     url: str | None = None,
     modele: str | None = None,
-    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    timeout: float | None = None,
     alerte_id: UUID | None = None,
 ) -> tuple[str, bool]:
     """Retourne (texte, repli_utilise), sans afficher de sortie libre du modèle.
 
     Chaque repli est journalisé avec sa cause (voir `CAUSES_REPLI`).
+    `timeout` explicite (secondes) prime ; sinon `timeout_configure()`.
     """
     debut = monotonic()
     try:
@@ -368,13 +398,15 @@ async def expliquer_alerte(
         "SOUVERAIN_OLLAMA_MODEL", "ministral-3:8b-instruct-2512-q4_K_M"
     )
 
+    delai = timeout if timeout is not None else timeout_configure()
+
     cause: CauseRepli
     try:
         contenu = await asyncio.wait_for(
             asyncio.to_thread(
-                _requete_ollama_sync, base_url, nom_modele, faits, timeout
+                _requete_ollama_sync, base_url, nom_modele, faits, delai
             ),
-            timeout=timeout,
+            timeout=delai,
         )
     except Exception as exc:
         # Ne pas exposer les détails techniques à l'utilisateur ni au journal.

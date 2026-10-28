@@ -19,6 +19,7 @@ journaux. Les données sont synthétiques.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import math
@@ -171,6 +172,9 @@ def empreintes_courantes(url: str, modele: str) -> dict[str, Any]:
         "traductions_fr_sha256": sha256_fichier(traductions),
         "max_words": ia.MAX_WORDS,
         "timeout_code_secondes": ia.DEFAULT_TIMEOUT_SECONDS,
+        "timeout_variable": ia.TIMEOUT_ENV_VAR,
+        "timeout_min_s": ia.MIN_TIMEOUT_SECONDS,
+        "timeout_max_s": ia.MAX_TIMEOUT_SECONDS,
         "fichiers_lot": {n: sha256_fichier(DONNEES / n) for n in FICHIERS_LOT},
     }
 
@@ -324,6 +328,38 @@ def resumer(appels: list[dict[str, Any]], pic_octets: int) -> dict[str, Any]:
     }
 
 
+def releve_api_ps(url: str, modele: str) -> dict[str, Any]:
+    """Relève le contexte et le keep_alive effectifs via /api/ps.
+
+    Ne fait jamais échouer la campagne : si l'API est indisponible, répond
+    autrement qu'attendu ou ne liste pas le modèle, on consigne la raison.
+    `keep_alive_effectif_approx_s` = expires_at - instant du relevé (approximatif).
+    """
+    moment = datetime.now(UTC)
+    base: dict[str, Any] = {"horodatage": moment.isoformat(timespec="seconds")}
+    try:
+        modeles = api_get(url, "/api/ps")["models"]
+        entree = next(m for m in modeles if modele in (m.get("name"), m.get("model")))
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, StopIteration) as exc:
+        return {**base, "disponible": False, "raison": type(exc).__name__}
+
+    keep_alive: int | None = None
+    with contextlib.suppress(KeyError, ValueError, TypeError):
+        keep_alive = round(
+            (datetime.fromisoformat(str(entree["expires_at"])) - moment).total_seconds()
+        )
+    return {
+        **base,
+        "disponible": True,
+        "context_length": entree.get("context_length"),
+        "keep_alive_effectif_approx_s": keep_alive,
+        "expires_at": entree.get("expires_at"),
+        "size_octets": entree.get("size"),
+        "size_vram_octets": entree.get("size_vram"),
+        "digest": entree.get("digest"),
+    }
+
+
 def attendre_ollama(url: str, delai: float = 120.0) -> None:
     fin = time.monotonic() + delai
     while time.monotonic() < fin:
@@ -351,7 +387,14 @@ def commande_executer(args: argparse.Namespace) -> int:
         return 2
 
     lot = json.loads((DONNEES / "lot_v2.json").read_text("utf-8"))
-    timeout = float(ia.DEFAULT_TIMEOUT_SECONDS)
+    timeout = ia.timeout_configure()
+    if timeout != gel.get("timeout_code_secondes"):
+        print(
+            f"{ia.TIMEOUT_ENV_VAR} donne {timeout} s, alors que le gel est à "
+            f"{gel.get('timeout_code_secondes')} s."
+        )
+        print("Retire la variable pour rejouer la campagne dans les conditions gelées.")
+        return 2
 
     conteneur: str | None = None
     if not args.sans_docker:
@@ -363,6 +406,7 @@ def commande_executer(args: argparse.Namespace) -> int:
     echantillonneur = EchantillonneurMemoire(conteneur)
     echantillonneur.demarrer()
     appels: list[dict[str, Any]] = []
+    releves: dict[str, dict[str, Any]] = {}
     try:
         entrees = {e["id"]: e for e in lot["bloc_b"]}
         plan: list[tuple[str, str, int]] = []
@@ -373,11 +417,14 @@ def commande_executer(args: argparse.Namespace) -> int:
         for etiquette, ident, passage in plan:
             resultat = evaluer_appel(faits_bloc_b(entrees[ident]), url, modele, timeout)
             appels.append({"entree": etiquette, "source": ident, "passage": passage, **resultat})
+            if "apres_premier_appel" not in releves:
+                releves["apres_premier_appel"] = releve_api_ps(url, modele)
             etat = "repli" if resultat["repli"] else "ok"
             print(
                 f"{etiquette:>6} p{passage}  {resultat['duree_s']:>7.2f}s  {etat}"
                 f"{'  erreur=' + resultat['erreur'] if resultat['erreur'] else ''}"
             )
+        releves["fin_campagne"] = releve_api_ps(url, modele)
     finally:
         echantillonneur.arreter()
 
@@ -386,6 +433,8 @@ def commande_executer(args: argparse.Namespace) -> int:
         "gel": str(chemin_gel.name),
         "date": datetime.now(UTC).isoformat(timespec="seconds"),
         "commit": commande(["git", "rev-parse", "HEAD"]),
+        "timeout_utilise_s": timeout,
+        "releves_api_ps": releves,
         "synthese": synthese,
         "appels": appels,
     }

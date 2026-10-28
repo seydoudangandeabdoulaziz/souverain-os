@@ -69,17 +69,62 @@ serveur écrit lui-même les phrases. Cet ADR régularise cet écart.
   Ils deviennent des tests du code de construction des phrases plutôt que des
   contrôles de texte libre. C3 (aucun verdict) et C7 (forme) restent à vérifier
   sur les phrases fixes. C5 (repli) reste le critère central à démontrer.
-- **Lot de validation :** à réécrire en version suivante (v2) pour tester les
-  16 jeux de faits (`FaitsAlerte`), la validation stricte de la réponse du
-  modèle, la répétabilité de l'ordre sur 3 passages et le déclenchement du
-  repli. Le lot v1 en texte libre n'est plus la preuve attendue.
+- **Lot de validation :** réécrit en v2 (`docs/ETAPE_6B_LOT_VALIDATION_V2.md`,
+  validé par le fondateur le 27 octobre 2026) : 16 jeux de faits
+  (`FaitsAlerte`), validation stricte de la réponse du modèle, répétabilité de
+  l'ordre et déclenchement du repli. Le lot v1 en texte libre n'est plus la
+  preuve attendue.
 - **Témoins historiques F03, F05, F07, F08 :** conservés comme sorties libres
   que le contrôleur doit rejeter (test déjà présent).
 - **Journalisation :** aucun texte généré ni identifiant de compte dans les
   journaux ; uniquement horodatage, identifiant d'alerte, code d'échec, durée.
-  À implémenter, non encore présent.
+  Implémentée le 27 octobre 2026 (cinq codes : `faits_invalides`,
+  `modele_indisponible`, `delai_depasse`, `reponse_invalide`,
+  `texte_trop_long`).
 - **Performance et mémoire :** la mesure de durée et de RAM du conteneur,
   et la réserve historique de 6,618 Gio contre 6,5 Gio, restent à traiter.
+
+## Timeout : valeur de campagne et valeur de déploiement
+
+Deux valeurs distinctes, à ne pas confondre :
+
+1. **Timeout de campagne : 120 s.** C'est la valeur par défaut du code, gelée
+   avec le lot v2 (`gel_v2.json`, champ `timeout_code_secondes`). La campagne
+   du bloc B est jouée dans ces conditions : le script refuse de démarrer si
+   `SOUVERAIN_OLLAMA_TIMEOUT` donne une autre valeur, et consigne le timeout
+   utilisé dans le fichier de résultats.
+2. **Timeout de déploiement : valeur à retenir après mesure.** Règle du lot
+   v2 (§5) : 1,5 fois le 95e centile du bloc B, hors appel à froid, jamais
+   inférieur à l'appel à froid mesuré. Cette valeur est appliquée par la
+   variable d'environnement `SOUVERAIN_OLLAMA_TIMEOUT`, **sans modifier le
+   code** ni invalider le gel.
+
+Règles de la variable (approuvées par le fondateur le 27 octobre 2026) :
+
+- valeur valide : nombre fini compris entre **5 s et 300 s**, bornes incluses ;
+- variable absente, vide, non numérique, `NaN`, infinie ou **hors bornes** :
+  retour à **120 s** (une valeur hors bornes n'est pas ramenée à la borne) ;
+- lue à chaque appel, jamais à l'import ; un `timeout` passé explicitement à
+  `expliquer_alerte` prime sur la variable ;
+- la valeur brute de la variable n'est jamais journalisée.
+
+Cette décision remplace l'ancienne règle « 120 s par tentative, 180 s au
+total » de l'ADR-006 et de la grille initiale : il n'y a plus de nouvelle
+tentative (voir la grille, §8).
+
+Le gel enregistre aussi les valeurs effectives de `context_length` et de
+`keep_alive` (relevé de l'API `/api/ps` après le premier appel et en fin de
+campagne), ou la raison pour laquelle ce relevé est indisponible.
+
+Limites assumées :
+
+- le timeout de déploiement retenu après mesure **n'est pas rejoué** par une
+  seconde campagne : c'est un réglage d'exploitation qui peut seulement faire
+  passer plus d'appels lents en repli, sans changer la logique de contrôle ;
+- une valeur invalide de la variable retombe silencieusement sur 120 s : elle
+  n'est pas signalée dans le journal ;
+- `context_length` et `keep_alive` effectif ne sont relevés que si l'API
+  `/api/ps` les expose (selon la version d'Ollama).
 
 ## Limites MVP
 
@@ -98,15 +143,29 @@ serveur écrit lui-même les phrases. Cet ADR régularise cet écart.
   du fichier et aucun fichier Python de la Brique 7 ne sont modifiés. Le
   bouton et ses libellés viennent du mécanisme `t()` propre à `souverain_app`
   (`souverain_app/traductions/`), même principe que la Brique 8.
+- **27 octobre 2026 — timeout configurable approuvé (option B).** Le
+  fondateur approuve `SOUVERAIN_OLLAMA_TIMEOUT` (défaut 120 s, bornes 5 s à
+  300 s, valeur absente ou invalide : 120 s), la distinction entre timeout de
+  campagne et timeout de déploiement ci-dessus, et le relevé de
+  `context_length` et `keep_alive` via `/api/ps`. Aucun changement du prompt,
+  du contrôleur de sélection, des options du modèle ni du lot v2.
+- **27 octobre 2026 — gabarits applicatifs conservés.** Le fondateur conserve
+  telles quelles les formulations « Une vérification des données est
+  nécessaire » et « réponse rejetée » (`fr.py`), déclarées comme exceptions
+  explicites dans `tests/test_lot_v2.py`.
 
 ## Points non couverts par cet ADR
 
-- Les phrases françaises construites par le serveur dans `explication_ia.py`
-  (texte de l'explication elle-même) sont encore écrites en dur : leur
-  externalisation via `t()` reste à traiter, avec les tests du contrôleur.
+Traités le 27 octobre 2026 : externalisation des phrases du serveur via `t()`,
+nettoyage du dépôt, corrections mypy, journalisation C5.
+
+Restent ouverts :
+
 - Le template de la Brique 7 contient des en-têtes de tableau en dur
   (« Pattern », « Détecté le »), antérieurs à la 6b : hors périmètre de cet
-  ADR, à signaler au fondateur séparément.
-- Nettoyage du dépôt et corrections mypy.
-
-Ces points suivent comme étapes distinctes.
+  ADR, décision du fondateur à prendre séparément.
+- Les noms de patterns et le statut de l'alerte (`ouverte`, `fermee`) sont
+  affichés comme identifiants bruts, non traduits.
+- Mot de passe de démonstration en clair dans `scripts/demo_alertes.py`.
+- Réserve mémoire de la 6a (6,618 Gio contre 6,5 Gio) et valeur finale du
+  timeout de déploiement : à documenter après la campagne.

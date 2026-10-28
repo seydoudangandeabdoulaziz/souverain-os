@@ -11,6 +11,7 @@ import importlib.util
 import json
 import threading
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import ModuleType
@@ -36,6 +37,7 @@ campagne = _charger_script()
 
 class _Etat:
     mode = "valide"  # « valide » ou « invalide »
+    ps = "ok"  # « ok », « absent » (404), « invalide » (corps non JSON) ou « sans_modele »
     appels_chat = 0
 
 
@@ -52,7 +54,29 @@ class _Gestionnaire(BaseHTTPRequestHandler):
         self.wfile.write(donnees)
 
     def do_GET(self) -> None:  # noqa: N802
+        if self.path == "/api/ps":
+            self._repondre_ps()
+            return
         self._repondre({"models": [{"name": _MODELE, "digest": _DIGEST}]})
+
+    def _repondre_ps(self) -> None:
+        if _Etat.ps == "absent":
+            self.send_error(404)
+            return
+        if _Etat.ps == "invalide":
+            donnees = b"ceci n'est pas du json"
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(donnees)))
+            self.end_headers()
+            self.wfile.write(donnees)
+            return
+        if _Etat.ps == "sans_modele":
+            self._repondre({"models": []})
+            return
+        expire = (datetime.now(UTC) + timedelta(seconds=300)).isoformat()
+        self._repondre(
+            {"models": [{"name": _MODELE, "context_length": 4096, "expires_at": expire}]}
+        )
 
     def do_POST(self) -> None:  # noqa: N802
         longueur = int(self.headers["Content-Length"])
@@ -69,6 +93,7 @@ class _Gestionnaire(BaseHTTPRequestHandler):
 @pytest.fixture
 def faux_ollama(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
     _Etat.mode = "valide"
+    _Etat.ps = "ok"
     _Etat.appels_chat = 0
     serveur = ThreadingHTTPServer(("127.0.0.1", 0), _Gestionnaire)
     fil = threading.Thread(target=serveur.serve_forever, daemon=True)
@@ -195,3 +220,67 @@ def test_ollama_injoignable_donne_un_message_clair(
 ) -> None:
     monkeypatch.setenv("SOUVERAIN_OLLAMA_URL", "http://127.0.0.1:9")
     assert campagne.main(["geler", "--gel", str(tmp_path / "gel.json")]) == 3
+
+
+def test_le_gel_consigne_la_variable_de_timeout_et_ses_bornes(
+    faux_ollama: str, tmp_path: Path
+) -> None:
+    gel = json.loads(_geler(tmp_path).read_text("utf-8"))
+
+    assert gel["timeout_code_secondes"] == 120.0
+    assert gel["timeout_variable"] == "SOUVERAIN_OLLAMA_TIMEOUT"
+    assert (gel["timeout_min_s"], gel["timeout_max_s"]) == (5.0, 300.0)
+
+
+def test_le_rapport_enregistre_le_contexte_et_le_keep_alive_effectifs(
+    faux_ollama: str, tmp_path: Path
+) -> None:
+    gel = _geler(tmp_path)
+    assert _executer(gel, tmp_path) == 0
+
+    rapport = _rapport(tmp_path)
+    assert rapport["timeout_utilise_s"] == 120.0
+    assert set(rapport["releves_api_ps"]) == {"apres_premier_appel", "fin_campagne"}
+    for releve in rapport["releves_api_ps"].values():
+        assert releve["disponible"] is True
+        assert releve["context_length"] == 4096
+        assert 290 <= releve["keep_alive_effectif_approx_s"] <= 300
+
+
+@pytest.mark.parametrize("mode_ps", ["absent", "invalide", "sans_modele"])
+def test_api_ps_indisponible_ne_fait_pas_echouer_la_campagne(
+    mode_ps: str, faux_ollama: str, tmp_path: Path
+) -> None:
+    gel = _geler(tmp_path)
+    _Etat.ps = mode_ps
+
+    assert _executer(gel, tmp_path) == 0
+
+    rapport = _rapport(tmp_path)
+    assert rapport["synthese"]["appels_chauds"] == 24
+    for releve in rapport["releves_api_ps"].values():
+        assert releve["disponible"] is False
+        assert releve["raison"]
+        assert "context_length" not in releve
+
+
+def test_un_timeout_different_du_gel_empeche_la_campagne(
+    faux_ollama: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    gel = _geler(tmp_path)
+    monkeypatch.setenv("SOUVERAIN_OLLAMA_TIMEOUT", "60")
+
+    assert _executer(gel, tmp_path) == 2
+    assert _Etat.appels_chat == 0, "Aucun appel ne doit partir hors des conditions gelées."
+
+
+@pytest.mark.parametrize("valeur", ["120", "pas_un_nombre", "9999"])
+def test_une_variable_equivalente_a_120_secondes_reste_acceptee(
+    valeur: str, faux_ollama: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """« 120 » vaut le défaut ; une valeur invalide ou hors bornes retombe à 120."""
+    gel = _geler(tmp_path)
+    monkeypatch.setenv("SOUVERAIN_OLLAMA_TIMEOUT", valeur)
+
+    assert _executer(gel, tmp_path) == 0
+    assert _rapport(tmp_path)["timeout_utilise_s"] == 120.0
