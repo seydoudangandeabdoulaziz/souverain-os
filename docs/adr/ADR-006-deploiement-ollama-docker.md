@@ -1,6 +1,6 @@
 # ADR-006 — Déploiement d'Ollama dans Docker
 
-- **Statut :** Accepté en principe — réserves ouvertes
+- **Statut :** Accepté — réserve mémoire ouverte (mis à jour le 30 octobre 2026, voir §8)
 - **Date :** 21 octobre 2026
 - **Contexte :** Clôture de l'étape 6a et préparation de l'étape 6b
 
@@ -105,3 +105,31 @@ réussite des tests : l'étape 6b reste bloquée jusqu'à la démonstration du
 contrôle sur les erreurs connues (F03, F05, F07, F08) et la réussite du lot
 de validation. Les réserves ouvertes (mémoire, timeout provisoire) sont
 inchangées.
+
+## 8. Mise à jour du 30 octobre 2026 — clôture de l'étape 6b
+
+L'étape 6b a été validée par le fondateur le 30 octobre 2026
+(`docs/ETAPE_6B_BILAN.md`, ADR-007). État des points de cet ADR :
+
+| Point | État |
+|---|---|
+| Blocage de l'étape 6b (§2 point 6, §6) | **Levé** : critères de fidélité définis (grille, lot v2), tests passés, validation du fondateur |
+| §4 — persistance du modèle dans le volume | Constatée : le modèle est présent après les redémarrages du conteneur du 28 octobre |
+| §4 — image et digest vérifiés | Consignés dans `docs/etape_6b_donnees/gel_v2.json` (image épinglée par digest, digest complet du modèle) |
+| §4 — mesures de mémoire et de durée | Campagne du 28 octobre 2026 : appel à froid 47,6 s, à chaud médiane 9,3 s et p95 11,6 s, pic mémoire du conteneur 6,284 Gio |
+| §4 — tests de fidélité automatisés (poids et comptage) | Lot v2, blocs A, B et C ; cas A1 et A2 |
+| §4 — limites documentées, validation du fondateur | Bilan §6 ; validation du 30 octobre 2026 |
+| Réserve « timeout provisoire » (§7) | **Levée** par l'ADR-007 : 120 s par défaut, variable `SOUVERAIN_OLLAMA_TIMEOUT` bornée de 5 s à 300 s, une seule tentative |
+| Réserve mémoire | **Reste ouverte** (voir ci-dessous) |
+
+**Réserve mémoire — non levée par cette mise à jour.** Le pic mesuré le
+28 octobre (6,284 Gio, par `docker stats`, avec 2 secondes d'attente entre deux
+relevés : la période réelle est donc supérieure) est inférieur à 6,5 lorsque les
+deux valeurs sont exprimées en Gio, comme dans cet ADR. Le seuil n'est pas
+modifié et la décision sur ce critère reste au fondateur. Deux précisions : les
+documents de la 6a écrivent le seuil en « Go » et la mesure en « GiB », et
+l'unité du seuil n'a jamais été précisée ; l'écart entre 6,53 GiB (RSS du
+processus natif, 6a) et 6,618 Gio (conteneur, §1) n'est pas réconcilié.
+
+**Non traité par cette mise à jour :** le point 4 du §2 (Ollama natif, ni
+désinstallé ni vérifié ici).

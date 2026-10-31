@@ -10,6 +10,12 @@ objet depuis l'ADR-007. Le fichier v1 est conservé comme historique.
 Références : `docs/adr/ADR-007-explication-ia-selection-identifiants.md`,
 `docs/ETAPE_6B_GRILLE_FIDELITE.md`, `docs/adr/ADR-006-deploiement-ollama-docker.md`.
 
+**Correction du 30 octobre 2026.** Au §5, une phrase attribuait à l'ADR-006 la
+règle « 120 s par tentative, 180 s au total » : cette règle figurait dans la
+grille initiale, et l'ADR-006 laissait ouverte une réserve « timeout
+provisoire ». Seule cette phrase est corrigée ; les données du lot, les critères
+et le gel (`gel_v2.json`) sont inchangés.
+
 ---
 
 ## 1. Pourquoi un lot v2
@@ -188,7 +194,8 @@ s'en écarte, c'est un constat à documenter, pas un résultat à ajuster.
 Les mesures du bloc B servent à fixer le timeout sur données réelles :
 
 - le code actuel utilise un timeout unique de 120 s, sans nouvelle tentative ;
-  l'ADR-006 et la grille parlent de 120 s par tentative et 180 s au total :
+  la grille parle de 120 s par tentative et 180 s au total, et l'ADR-006
+  laisse ouverte une réserve « timeout provisoire » :
   **cet écart est à régler explicitement** ;
 - la sortie attendue est un court JSON (quelques dizaines de tokens) au lieu
   de 250 à 350 tokens en texte libre : les durées de la 6a ne s'appliquent
