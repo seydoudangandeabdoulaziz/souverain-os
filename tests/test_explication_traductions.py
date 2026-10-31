@@ -126,7 +126,7 @@ def app_fragment() -> FastAPI:
     utilisateur = AuthenticatedUser(
         user_id=uuid4(),
         tenant_id=tenant.tenant_id,
-        role="auditor",
+        role="analyst",
         souverain_id=uuid4(),
     )
     app.dependency_overrides[routes.tenant_valide] = lambda: tenant

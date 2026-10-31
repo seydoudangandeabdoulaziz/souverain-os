@@ -6,6 +6,12 @@ Deux routes :
   bloc) ;
 - GET /alertes/{id}/expliquer : produit l'explication, à la demande.
 
+Autorisations (ADR-007) : seuls `analyst` et `admin` peuvent afficher le bouton
+et déclencher une génération. Pour `auditor` (ou tout rôle inconnu) :
+- le fragment répond 200 avec un contenu vide, pour que la page de détail ne
+  garde pas un indicateur de chargement bloqué ;
+- `/expliquer` répond 403, avant toute lecture en base et tout appel à Ollama.
+
 Aucun texte utilisateur n'est écrit en dur : tout passe par t() (ADR-001).
 """
 from __future__ import annotations
@@ -14,6 +20,7 @@ from html import escape
 from uuid import UUID
 
 from brique_01_postgresql.connection import create_pool
+from brique_02_auth_rbac.rbac import Role, require_role
 from brique_02_auth_rbac.session import AuthenticatedUser
 from brique_05_scoring_alertes.seuils import POIDS_PAR_PATTERN, SEUIL_ALERTE
 from brique_07_dashboard import lecture
@@ -28,6 +35,14 @@ from souverain_app.traductions import t
 
 router = APIRouter(tags=["explication-ia"])
 
+# Source unique des rôles autorisés, partagée par les deux routes.
+_ROLES_AUTORISES_EXPLICATION: tuple[Role, ...] = (Role.ANALYST, Role.ADMIN)
+
+
+def _role_peut_expliquer(role: str) -> bool:
+    """Refus par défaut : tout rôle absent de la liste autorisée est refusé."""
+    return role in {autorise.value for autorise in _ROLES_AUTORISES_EXPLICATION}
+
 
 @router.get("/alertes/{alerte_id}/explication", response_class=HTMLResponse)
 async def fragment_explication_route(
@@ -35,8 +50,14 @@ async def fragment_explication_route(
     tenant: MetadonneesTenant = Depends(tenant_valide),  # noqa: B008
     utilisateur: AuthenticatedUser = Depends(get_current_user_from_cookie),  # noqa: B008
 ) -> HTMLResponse:
-    """Retourne le bouton d'explication, sans accès à la base ni au modèle."""
-    del utilisateur  # L'identité protège la route ; elle n'est pas utilisée ici.
+    """Retourne le bouton d'explication, sans accès à la base ni au modèle.
+
+    Réponse 200 vide pour un rôle non autorisé : HTMX remplace alors le
+    contenu provisoire de la page de détail par rien (un 4xx ne serait pas
+    substitué et laisserait l'indicateur de chargement affiché).
+    """
+    if not _role_peut_expliquer(utilisateur.role):
+        return HTMLResponse(content="")
 
     langue = langue_pour_pays(tenant.country_code)
     return HTMLResponse(
@@ -52,12 +73,19 @@ async def fragment_explication_route(
 @router.get("/alertes/{alerte_id}/expliquer", response_class=HTMLResponse)
 async def expliquer_alerte_route(
     alerte_id: UUID,
+    # Le rôle est vérifié en premier : un refus (403) n'accède ni à PostgreSQL
+    # ni à Ollama. Même motif que la fermeture d'alerte de la Brique 8.
+    utilisateur: AuthenticatedUser = Depends(  # noqa: B008
+        require_role(  # noqa: B008
+            *_ROLES_AUTORISES_EXPLICATION,
+            user_dependency=get_current_user_from_cookie,
+        )
+    ),
     tenant: MetadonneesTenant = Depends(tenant_valide),  # noqa: B008
-    utilisateur: AuthenticatedUser = Depends(get_current_user_from_cookie),  # noqa: B008
 ) -> HTMLResponse:
     """Explique une alerte déjà enregistrée, dans le contexte du tenant authentifié."""
-    # Les dépendances d'authentification et de tenant sont évaluées avant la route.
-    del utilisateur  # L'identité est requise pour protéger la route, pas envoyée au modèle.
+    # L'identité sert à contrôler l'accès ; elle n'est ni envoyée au modèle ni journalisée.
+    del utilisateur
 
     pool = await create_pool()
     alerte = await lecture.lire_alerte(pool, tenant.schema_name, alerte_id)
