@@ -44,7 +44,7 @@ VALIDÉE
 | 3 | UX/UI (fondations) | **VALIDÉE** |
 | 4 | Prometheus/Grafana | **VALIDÉE** (4a + 4b) |
 | 5 | Test de charge du pipeline actuel | **VALIDÉE** |
-| 6 | Ollama/Mistral (→ Ministral 3 8B, voir détail) | 6a VALIDÉE (20 octobre 2026), 6b EN TEST — 256 tests du workspace réussis, Ruff propre ; lot officiel et critères C1–C5 encore à valider |
+| 6 | Ollama/Mistral (→ Ministral 3 8B, voir détail) | 6a VALIDÉE (20 octobre 2026), 6b **VALIDÉE** le 30 octobre 2026 par le fondateur — lot v2 sans échec bloquant, suite complète 486/486, vérifications avec de vraies sessions (`analyst`, `auditor`) ; réserves ouvertes, voir le détail |
 | 7 | Sécurité IA/RAG (conception) | NON COMMENCÉE |
 | 8 | RAG | NON COMMENCÉE |
 | 9 | Redis/Celery (conditionnel à l'étape 5) | NON COMMENCÉE |
@@ -1167,58 +1167,147 @@ commentaire).
 
 ## Détail — Étape 6b : explications IA fidèles et contrôlées
 
-**Statut : EN TEST — NON VALIDÉE.** Les contrôles locaux progressent,
-mais le lot officiel et les critères C1–C5 restent à valider.
+**Statut : VALIDÉE le 30 octobre 2026, par le fondateur (Seydou Dangande
+Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+La validation est prononcée « au regard du périmètre défini » : elle ne vaut
+pas garantie de fiabilité générale et **ne clôt pas les réserves** listées
+ci-dessous. Bilan final : `docs/ETAPE_6B_BILAN.md`.
 
-### Résultats locaux
+### Design retenu (ADR-007)
 
-- Tests ciblés : 51 réussis.
-- Suite complète : 256 tests réussis en 40,21 s.
-- Ruff : contrôles ciblés réussis.
-- Les témoins historiques F03, F05, F07 et F08 déclenchent le repli
-  déterministe lorsqu'ils sont fournis à la place du JSON structuré.
-- Ces résultats ne prouvent pas la fidélité des 48 sorties officielles.
+Le modèle ne reçoit aucun fait : il ordonne des identifiants d'affirmations
+(JSON) ; le serveur contrôle la réponse puis écrit les phrases à partir des
+faits structurés. Toute réponse invalide, échec, dépassement de délai ou
+texte de plus de 120 mots déclenche un repli déterministe, sans nouvelle
+tentative. Détail : `docs/adr/ADR-007-explication-ia-selection-identifiants.md`
+(statut « Accepté » depuis le 30 octobre 2026).
 
-### Travail restant
+### Régularisation du cadre et construction des preuves
 
-1. Vérifier les entrées, le modèle et son digest, le prompt et les paramètres.
-2. Tester les erreurs connues et mesurer les faux négatifs et faux rejets.
-3. Exécuter le lot officiel : 16 fiches × 3 passages, soit 48 sorties,
-   avec les témoins historiques et les variantes adverses.
-4. Vérifier les critères bloquants C1–C4 et le fonctionnement du repli C5.
-5. Mesurer et documenter les durées et la mémoire. La réserve historique
-   de 6,618 Gio contre 6,5 Gio reste ouverte.
-6. Présenter le bilan au fondateur. La validation officielle exige son
-   approbation explicite.
+Commits locaux, **non poussés** à la date de cette mise à jour : `fd5256a`
+(ADR-001 reconstruit, ADR-007, textes via `t()`), `ff63471` (nettoyage,
+README), `7bb83a3` (mypy), `b6a1d03` (phrases du serveur via `t()`),
+`3b133d1` (grille, lot v2, tests des blocs A et C), `37a1b30` (script de
+campagne), `15f1a50` (journalisation C5), `b647d4e` (timeout configurable,
+relevé `/api/ps`), `0ab1001` (gel du lot v2), `1006e30` (résultats de la campagne) ;
+les commits de la modification des autorisations et de la documentation
+finale suivent. Aucune modification des
+Briques 4, 5 et 6. Un fichier de la Brique 7 (`alerte_detail.html`) a été
+modifié avec l'approbation écrite du fondateur (bloc d'explication sans
+texte, ADR-007).
 
-Aucun changement aux Briques 4, 5 ou 6 n'est autorisé dans cette étape.
-Aucun RAG, agent ou SQL/Cypher généré n'est introduit.
+### Résultats
 
-Après clôture explicite de l'étape 6, reprendre l'étape 7 — Sécurité IA/RAG
-(conception). Aucune étape 6C n'est ajoutée.
+- **Bloc A** (couche déterministe, 16 cas) : 0 échec.
+- **Bloc B** (modèle réel, campagne du 28 octobre 2026, gel `0ab1001`,
+  8 entrées × 3 passages + 1 appel à froid) : 0 sortie acceptée non
+  conforme, 0 repli, 0 erreur. Fichier :
+  `docs/etape_6b_donnees/resultats_bloc_b_20261028_122418.json` (commité,
+  `1006e30`).
+- **Bloc C** (contrôleur, 16 réponses invalides dont 4 témoins historiques,
+  5 valides, 720 permutations) : tous les invalides rejetés, 0 faux rejet.
+- Tests ciblés chez le fondateur (27 octobre 2026) : 258 réussis ; Ruff et
+  mypy propres.
+- **Suite complète** avec PostgreSQL et Neo4j réels, chez le fondateur :
+  **463 réussis, 0 échec** (256 antérieurs + 207 ajoutés par la 6b).
+- **Navigateur** (29 octobre 2026, tenant de démonstration, compte
+  `analyste`, alerte `DEMO_COMPTE_001`) : explication avec le modèle (valeurs
+  exactes, cas score égal au seuil), repli avec le conteneur arrêté, et ligne
+  de journal C5 réelle (`cause: modele_indisponible`, cinq champs, sans compte
+  ni texte). Premier clic à froid : 53,7 s. Détail dans le bilan (§3 bis).
+- **Après l'ajout des autorisations (30 octobre 2026)** : suite complète
+  **486 réussis, 0 échec** ; `analyst` : bouton, clic et explication du
+  modèle (48,9 s à froid) ; `auditor` : pas de bouton, `/expliquer` → **403**
+  en 12,8 ms avec une session valide ; `admin` non vérifié visuellement
+  (couvert par les tests). Détail dans le bilan (§3 ter).
 
-### Références et réserves initiales conservées
+### Mesures (bloc B)
 
-- Grille de fidélité : `docs/ETAPE_6B_GRILLE_FIDELITE.md`.
-- Décision de déploiement : `docs/adr/ADR-006-deploiement-ollama-docker.md`,
-  notamment les sections 6 et 7.
-- Critères bloquants : exactitude numérique et signification, absence de
-  confusion entre grandeurs, absence de verdict ou d'injonction, absence
-  d'entités étrangères à la fiche et repli sur les faits structurés.
-- Critères suivis : imprécisions mineures et respect du format prévu
-  (120 mots / 6 phrases ; repli au-delà de 200 mots).
-- Seuil de validation du lot : zéro échec bloquant sur 48 sorties
-  (16 fiches × 3 passages). Ce seuil ne garantit pas une fiabilité générale.
-- L'historique des décisions humaines reste exclu de la fiche de faits ;
-  les journaux ne doivent pas contenir le texte généré.
-- Timeout initial : 120 s par tentative, 180 s au total, à confirmer par
-  mesure sur la machine.
-- Les 10 cas de la 6a doivent être versionnés et adaptés au format de
-  production ; F03, F05, F07 et F08 conservent leurs sorties originales
-  comme témoins.
-- Le lot officiel doit être figé, le contrôle éprouvé sur les erreurs connues
-  et les variantes adverses, puis la durée et la mémoire mesurées.
-- La réserve mémoire historique de 6,618 Gio contre 6,5 Gio reste ouverte.
+- À froid : 47,6 s (une mesure). À chaud : médiane 9,3 s, p95 11,6 s.
+- Processeur seul, contexte effectif 4096, keep_alive effectif 300 s.
+- Pic mémoire du conteneur : **6,284 Gio** (`docker stats`, 2 s d'attente
+  entre deux relevés, période réelle supérieure). Seuil historique de 6,5
+  **non modifié** ; son unité n'a jamais été précisée (« Go » dans la 6a,
+  « Gio » dans l'ADR-006) ; décision sur ce critère au fondateur.
+- **Écart historique de la 6a, non tranché** : 6,53 GiB (RSS du processus
+  `llama-server` natif, `VERDICT_ETAPE_6A.md`) contre 6,618 Gio (pic du
+  conteneur, ADR-006) : méthodes et dates différentes.
+
+### Décisions du fondateur (28 au 30 octobre 2026)
+
+1. Timeout de déploiement : **120 s conservé** ; la règle du lot (1,5 × p95,
+   jamais sous l'appel à froid) aurait donné 47,6 s, fixé par une seule
+   mesure à froid. `SOUVERAIN_OLLAMA_TIMEOUT` reste disponible (5 à 300 s).
+2. Mémoire : pic documenté, seuil inchangé, écart historique signalé.
+3. Variation d'ordre de B7 : non bloquante, cause inconnue.
+4. Ancien défaut poids/comptage de la 6a : « sans objet pour le design
+   actuel », sans prétendre qu'il a été corrigé rétroactivement.
+5. **Autorisations de la route d'explication (29 octobre 2026, variante 1) :**
+   `analyst` et `admin` déclenchent une explication ; `auditor` ne voit pas le
+   bouton (fragment 200 vide) et reçoit 403 en accès direct, sans appel à
+   Ollama. Aucun effet sur le gel (seul `explication_routes.py` change,
+   empreintes vérifiées identiques à `0ab1001`). 23 tests ajoutés, 5
+   mutations détectées. Suite complète rejouée : **486 sur 486**.
+6. **Validation de l'étape 6b (30 octobre 2026)** : prononcée par le fondateur
+   au regard du périmètre défini, après les résultats des tests, les
+   vérifications avec de vraies sessions et les contrôles de sécurité.
+
+### Réserves (toutes conservées après la validation)
+
+Variation d'ordre de B7 (cause inconnue) ; apport du modèle limité à l'ordre
+des phrases (gain non mesuré) ; un seul appel à froid ; mesures sur une seule
+machine, sans GPU ; `nombre_transactions` non alimenté par la route ;
+valeur invalide de la variable de timeout non signalée au journal ; premier
+clic à froid de 53,7 s ; **indicateur de chargement du bouton : amélioration
+d'interface à traiter séparément, hors périmètre de validation** ;
+réserves distinctes pour évolution ultérieure : limite de fréquence et de
+concurrence, traçabilité de l'utilisateur, déclenchement possible par un site
+tiers (GET, `SameSite=lax`, non testé), stockage et consultation des
+explications par l'auditeur (non positionné) ; deux
+gabarits conservés avec un terme de la liste interdite (« vérification »,
+« réponse rejetée »). Hors périmètre, ouverts : en-têtes de tableau en dur de
+la Brique 7, identifiants bruts affichés (patterns, statut), mot de passe de
+démonstration dans `scripts/demo_alertes.py`.
+
+### Suites après la validation
+
+1. Commiter les modifications finales (routes, tests, ADR-007 « Accepté »,
+   bilan, `avancement.md`) ; décider du push des commits locaux.
+2. Appliquer, si le fondateur l'approuve, la proposition d'ajout de l'ADR-007
+   aux décisions verrouillées (`docs/PROPOSITION_DECISIONS_VERROUILLEES_6B.md`) :
+   modification réservée au fondateur.
+3. Mettre à jour les documents qui mentionnent encore la 6b « en test » :
+   `README.md`, et le statut de l'ADR-006 (« Accepté en principe — réserves
+   ouvertes »).
+4. Traiter séparément, quand le fondateur le décidera : indicateur de
+   chargement du bouton (amélioration d'interface), limite de fréquence et de
+   concurrence, traçabilité de l'utilisateur, déclenchement par un site tiers,
+   stockage et consultation des explications, en-têtes en dur de la Brique 7,
+   mot de passe de démonstration, unité du seuil mémoire.
+5. **Étape 7 — Sécurité IA/RAG (conception) : NON COMMENCÉE.** Elle ne démarre
+   que sur demande explicite du fondateur. Aucune étape 6C n'est ajoutée.
+
+### Invariants conservés
+
+- Aucun changement aux Briques 4, 5 ou 6 n'est autorisé dans cette étape
+  (aucune modification constatée).
+- Aucun RAG, agent ou SQL/Cypher généré n'est introduit.
+- L'historique des décisions humaines reste exclu des faits transmis ; les
+  journaux ne contiennent ni texte généré ni identifiant de compte
+  (journalisation C5 testée).
+- Un résultat sans échec bloquant ne garantit pas une fiabilité générale :
+  le lot compte 16 cas, 8 entrées de modèle et une seule machine.
+
+### Références
+
+- Grille de fidélité : `docs/ETAPE_6B_GRILLE_FIDELITE.md` (révisée le
+  27 octobre 2026).
+- Lot de validation : `docs/ETAPE_6B_LOT_VALIDATION_V2.md`, gel
+  `docs/etape_6b_donnees/gel_v2.json`.
+- Décision de déploiement : `docs/adr/ADR-006-deploiement-ollama-docker.md`
+  (sa réserve « timeout provisoire » est levée par l'ADR-007 : une seule
+  tentative, 120 s par défaut, réglable ; l'ancienne règle « 120 s par
+  tentative, 180 s au total » figurait dans la grille initiale).
 
 ## Campagne fonctionnelle (parcours analyste, 6 scénarios de fraude synthétique)
 

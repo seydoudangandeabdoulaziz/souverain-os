@@ -1,7 +1,8 @@
 # ADR-007 — Explication IA des alertes : sélection d'identifiants plutôt que rédaction libre
 
-**Statut : Proposé.**
-**Date : 25 octobre 2026.**
+**Statut : Accepté (30 octobre 2026).**
+**Date de la décision : 25 octobre 2026.**
+**Date d'acceptation : 30 octobre 2026, avec la validation de l'étape 6b par le fondateur.**
 **Décideur : Seydou Dangande Abdoul Aziz (fondateur).**
 **Contexte : Étape 6b. Complète ADR-004 (modèle) et ADR-006 (déploiement).**
 
@@ -84,6 +85,60 @@ serveur écrit lui-même les phrases. Cet ADR régularise cet écart.
 - **Performance et mémoire :** la mesure de durée et de RAM du conteneur,
   et la réserve historique de 6,618 Gio contre 6,5 Gio, restent à traiter.
 
+## Autorisations de la route d'explication
+
+Décision du fondateur du 29 octobre 2026 (variante 1) :
+
+| Rôle | Bouton (`/explication`) | Génération (`/expliquer`) |
+|---|---|---|
+| `admin` | affiché | autorisée |
+| `analyst` | affiché | autorisée |
+| `auditor` | **non affiché** : réponse 200 au contenu vide | **403** |
+| rôle inconnu ou vide | non affiché (200 vide) | 403 (refus par défaut) |
+
+- Le fragment d'un rôle non autorisé répond **200 vide** et non 403 : HTMX ne
+  substitue pas une réponse 4xx, et l'indicateur de chargement provisoire de
+  la page de détail resterait affiché indéfiniment.
+- Le rôle est vérifié **avant** le tenant : un refus ne lit pas la base et
+  n'appelle pas Ollama (testé avec des espions). Le message du 403 est celui
+  de la Brique 2 ; aucun nouveau texte n'est créé.
+- Les deux routes partagent une seule liste de rôles
+  (`_ROLES_AUTORISES_EXPLICATION`) : `Role.ANALYST` et `Role.ADMIN`.
+- Même motif que la fermeture d'alerte de la Brique 8 (`analyst` et `admin`
+  agissent, `auditor` consulte).
+- **Aucun effet sur le gel du lot v2** : seul `explication_routes.py` change.
+  Les empreintes du contrôleur, des traductions, du prompt et des fichiers du
+  lot restent identiques à celles du commit `0ab1001` (vérifié).
+- Décision antérieure remplacée : la route était ouverte aux trois rôles sans
+  décision explicite.
+
+Variantes écartées :
+
+- *Explication déterministe pour l'auditeur* : exige un nouveau texte dans
+  `traductions/fr.py`, donc une nouvelle empreinte et, selon la règle du lot,
+  un lot v3.
+- *Stockage des explications pour consultation par l'auditeur* : chantier
+  distinct (migration, rôle PostgreSQL dédié, provisionnement par tenant,
+  conservation, tests). Sa place dans l'ordre de construction n'est pas
+  décidée ; aucune étape 6C n'est créée.
+
+Réserves distinctes, **non traitées ici** (évolutions ultérieures) :
+
+1. **Limite de fréquence et de concurrence.** Rien ne borne le nombre de
+   générations par utilisateur ou par tenant ; Ollama traite une requête à la
+   fois (`NUM_PARALLEL=1`) et les suivantes attendent.
+2. **Traçabilité de l'utilisateur.** L'identité de la personne qui déclenche une
+   génération n'est ni journalisée ni enregistrée ; seule l'alerte est
+   référencée dans le journal des replis.
+3. **Déclenchement par un site tiers.** La route est un GET et le cookie de
+   session est `SameSite=lax` : d'après ces attributs, un site tiers pourrait
+   faire lancer une génération par un utilisateur connecté (consommation de
+   ressources ; la réponse n'est pas lisible par ce site). Non testé.
+
+Amélioration d'interface, à traiter séparément et **hors du périmètre de
+validation de la 6b** : l'indicateur de chargement du bouton (le premier clic à
+froid dure environ 50 s sans retour visuel prévu dans le fragment).
+
 ## Timeout : valeur de campagne et valeur de déploiement
 
 Deux valeurs distinctes, à ne pas confondre :
@@ -109,8 +164,8 @@ Règles de la variable (approuvées par le fondateur le 27 octobre 2026) :
 - la valeur brute de la variable n'est jamais journalisée.
 
 Cette décision remplace l'ancienne règle « 120 s par tentative, 180 s au
-total » de l'ADR-006 et de la grille initiale : il n'y a plus de nouvelle
-tentative (voir la grille, §8).
+total » de la grille initiale (§8) : il n'y a plus de nouvelle tentative. Elle
+lève aussi la réserve « timeout provisoire » que l'ADR-006 laissait ouverte.
 
 Le gel enregistre aussi les valeurs effectives de `context_length` et de
 `keep_alive` (relevé de l'API `/api/ps` après le premier appel et en fin de
@@ -153,6 +208,18 @@ Limites assumées :
   telles quelles les formulations « Une vérification des données est
   nécessaire » et « réponse rejetée » (`fr.py`), déclarées comme exceptions
   explicites dans `tests/test_lot_v2.py`.
+- **30 octobre 2026 — étape 6b validée, ADR accepté.** Le fondateur valide
+  officiellement l'étape 6b « au regard du périmètre défini » : résultats des
+  tests, vérifications avec de vraies sessions et contrôles de sécurité jugés
+  satisfaisants. Les réserves et améliorations identifiées restent ouvertes
+  (voir `docs/ETAPE_6B_BILAN.md`) ; la validation ne les clôt pas.
+- **29 octobre 2026 — autorisations de la route d'explication (variante 1).**
+  Le fondateur retient : `analyst` et `admin` déclenchent une explication ;
+  `auditor` ne voit pas le bouton (fragment 200 vide) et reçoit 403 sur un
+  déclenchement direct, sans appel à Ollama ; limite de fréquence et
+  traçabilité de l'utilisateur consignées comme réserves distinctes ; aucun
+  changement de `explication_ia.py`, du prompt, des traductions, du lot v2 ni
+  du gel ; aucune migration ni stockage d'explications.
 
 ## Points non couverts par cet ADR
 
@@ -167,5 +234,8 @@ Restent ouverts :
 - Les noms de patterns et le statut de l'alerte (`ouverte`, `fermee`) sont
   affichés comme identifiants bruts, non traduits.
 - Mot de passe de démonstration en clair dans `scripts/demo_alertes.py`.
+- Limite de fréquence, traçabilité de l'utilisateur et indicateur de chargement
+  du bouton : voir la section « Autorisations de la route d'explication ».
+- Stockage et consultation des explications par l'auditeur : non positionné.
 - Réserve mémoire de la 6a (6,618 Gio contre 6,5 Gio) et valeur finale du
   timeout de déploiement : à documenter après la campagne.
