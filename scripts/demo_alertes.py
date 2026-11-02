@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
@@ -16,11 +18,22 @@ from brique_05_scoring_alertes.cli import executer_cycle_scoring
 TENANT = "tenant_demo_souverain"
 CODE = "DE"
 EMAIL = "analyste-demo@souverain.local"
-MOT_DE_PASSE = "Demo-Souverain-2026!"
+NOM_VARIABLE_ENV = "SOUVERAIN_DEMO_PASSWORD"
 COMPTE = "DEMO_COMPTE_001"
 
 
+def mot_de_passe_demo() -> str:
+    """Mot de passe du compte de démonstration, jamais écrit dans le dépôt.
+
+    Il vient de la variable SOUVERAIN_DEMO_PASSWORD si elle est renseignée ;
+    sinon il est tiré au hasard et affiché une seule fois à la fin du script.
+    """
+    fourni = os.environ.get(NOM_VARIABLE_ENV, "").strip()
+    return fourni or secrets.token_urlsafe(16)
+
+
 async def main() -> None:
+    mot_de_passe = mot_de_passe_demo()
     pool = await create_pool()
     try:
         async with pool.acquire() as conn:
@@ -57,7 +70,7 @@ async def main() -> None:
                     tenant_id=tenant_id,
                     souverain_id=generate_souverain_id(CODE, EMAIL),
                     email=EMAIL,
-                    password_hash=hash_password(MOT_DE_PASSE),
+                    password_hash=hash_password(mot_de_passe),
                     role="analyst",
                 )
             except Exception:
@@ -125,7 +138,7 @@ async def main() -> None:
         print("\n=== CONNEXION AU DASHBOARD ===")
         print("URL : http://127.0.0.1:8080/login")
         print(f"Email : {EMAIL}")
-        print(f"Mot de passe : {MOT_DE_PASSE}")
+        print(f"Mot de passe : {mot_de_passe}")
         print("Après connexion, ouvre : http://127.0.0.1:8080/alertes")
     finally:
         await close_pool()

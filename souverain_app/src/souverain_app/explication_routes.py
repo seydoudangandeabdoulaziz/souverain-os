@@ -35,6 +35,23 @@ from souverain_app.traductions import t
 
 router = APIRouter(tags=["explication-ia"])
 
+# Indicateur d'attente du bouton : une animation CSS, sans aucun texte, donc
+# sans nouvelle traduction (le gel du lot v2 couvre le fichier des traductions).
+# htmx affiche l'indicateur pendant la requête puis la réponse remplace tout le
+# fragment ; le bouton est désactivé pendant l'attente.
+_ID_INDICATEUR = "explication-attente"
+_STYLE_INDICATEUR = (
+    "<style>"
+    ".explication-spinner{display:inline-block;width:1em;height:1em;"
+    "margin-left:.6em;vertical-align:middle;border:2px solid currentColor;"
+    "border-right-color:transparent;border-radius:50%;"
+    "animation:explication-rotation .8s linear infinite}"
+    "@keyframes explication-rotation{to{transform:rotate(360deg)}}"
+    "@media (prefers-reduced-motion:reduce)"
+    "{.explication-spinner{animation-duration:2.4s}}"
+    "</style>"
+)
+
 # Source unique des rôles autorisés, partagée par les deux routes.
 _ROLES_AUTORISES_EXPLICATION: tuple[Role, ...] = (Role.ANALYST, Role.ADMIN)
 
@@ -63,8 +80,12 @@ async def fragment_explication_route(
     return HTMLResponse(
         content=(
             f'<button type="button" hx-get="/alertes/{alerte_id}/expliquer" '
-            'hx-target="#explication-ia" hx-swap="innerHTML">'
+            'hx-target="#explication-ia" hx-swap="innerHTML" '
+            f'hx-indicator="#{_ID_INDICATEUR}" hx-disabled-elt="this">'
             f"{escape(t('explication.bouton', langue))}</button>"
+            f'<span id="{_ID_INDICATEUR}" '
+            'class="htmx-indicator explication-spinner" aria-hidden="true"></span>'
+            f"{_STYLE_INDICATEUR}"
             f'<p class="aide">{escape(t("explication.aide", langue))}</p>'
         )
     )
