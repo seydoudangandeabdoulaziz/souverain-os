@@ -17,6 +17,13 @@
 Le flux fonctionnel principal (ingestion → détection → scoring/alertes
 → graphe → dashboard → audit) est désormais complet de bout en bout.
 
+## Extensions V2 (après le flux principal 0–8)
+
+| Extension | État |
+|---|---|
+| Brique 1 V2 — gouvernance des tenants (CLI : `create_tenant()`, activer, désactiver) | **Reconstruite et validée** (6 septembre 2026) |
+| Brique 2 V2 — gouvernance des utilisateurs (routes web, réservées à `admin`) | **Reconstruite et validée** (6 septembre 2026) |
+
 ## Note structurelle — module d'assemblage `souverain_app/`
 
 Introduit à l'analyse de la Brique 8, validé explicitement par le
@@ -30,23 +37,40 @@ dépende de l'autre. Point d'entrée réel du dashboard complet :
 
 ## Phase transverse
 
-Après le flux fonctionnel principal :
+Ordre consolidé après la revue d'architecture des 6 et 7 septembre 2026.
+État détaillé dans `avancement.md`, qui fait foi.
 
-- RAG ingestion/retrieval ;
-- Ollama/Mistral ;
-- PQC ;
-- Redis/Celery ;
-- Prometheus/Grafana ;
-- SOUVERAIN-ID complet ;
-- autres composants nécessaires.
+| Étape | Nom | État |
+|---|---|---|
+| 1 | Hygiène de socle (backup/restore, `/health`, logs structurés) | **Validée** (7 septembre 2026) |
+| 2 | Intégrité des données métier | **Validée** (8 septembre 2026) |
+| 3 | UX/UI (fondations) | **Validée** (14 septembre 2026) |
+| 4 | Prometheus/Grafana | **Validée** (4a et 4b, 19 septembre 2026) |
+| 5 | Test de charge du pipeline actuel | **Validée** (19 septembre 2026) |
+| 6 | Ollama/Mistral (→ Ministral 3 8B) | 6a **validée** (20 octobre 2026), 6b **validée** (30 octobre 2026) |
+| 7 | Sécurité IA/RAG (conception) | Non commencée |
+| 8 | RAG | Non commencée |
+| 9 | Redis/Celery (conditionnel à l'étape 5) | Non commencée |
+| 10 | SOUVERAIN-ID complet | Non commencée |
+| 11 | PQC (ML-KEM + ML-DSA) | Non commencée |
+| 12 | Résilience inter-États (conception) | Non commencée |
+
+Aucune étape 6C n'existe. L'étape 7 ne démarre que sur demande explicite du
+fondateur.
 
 **Note — changement de modèle LLM (7 octobre 2026)** : le libellé
-« Ollama/Mistral » ci-dessus désigne désormais **Ministral 3 8B
+« Ollama/Mistral » (étape 6) désigne désormais **Ministral 3 8B
 Instruct Q4_K_M**, pas Mistral 7B Q4_K_M du document fondateur.
 Décision actée après test de faisabilité (Étape 6a), détaillée dans
 `00_DECISIONS_VERROUILLEES.md` section 8 et
 `docs/adr/ADR-004-changement-modele-llm.md`. Mistral 7B reste cité ici
 et dans le document fondateur comme référence historique uniquement.
+
+L'explication IA des alertes (étape 6b, validée le 30 octobre 2026) suit le
+design de sélection d'identifiants de
+`docs/adr/ADR-007-explication-ia-selection-identifiants.md`
+(`00_DECISIONS_VERROUILLEES.md`, section 9). Ses réserves ouvertes sont
+consignées dans `docs/ETAPE_6B_BILAN.md`.
 
 ## Points en suspens — hors de cet ordre numéroté
 
@@ -57,25 +81,21 @@ pas encore positionnée dans cet ordre** — sa place exacte (après la
 Brique 7 ? en parallèle de la Brique 8 ?) reste à trancher explicitement
 le moment venu, pas anticipée ici.
 
-**Gouvernance multi-tenant / `create_tenant()`** (ajouté après
-clarification du périmètre de la Brique 8, 28 août 2026) : la Brique 3
-a laissé un contournement explicitement provisoire
-(`scripts/bootstrap_tenant_ne.sql`) en attendant "la vraie gouvernance",
-initialement supposée arriver en Brique 8. Le périmètre de la Brique 8 a
-été confirmé strictement limité à Audit + Human-in-the-loop (voir
-`00_DECISIONS_VERROUILLEES.md`), **confirmé de nouveau par
-l'implémentation réelle de la Brique 8** (4 septembre 2026, désormais
-validée sans `create_tenant()`) — `create_tenant()` reste donc, comme
-les notifications citoyens, un besoin réel identifié mais **non
-positionné** dans l'ordre numéroté. Aucune urgence MVP tant qu'un seul
-tenant (`tenant_ne`) est actif ; redevient pertinent à l'approche de la
-Phase 2 (premier export UEMOA). Sa place exacte reste à trancher
-explicitement le moment venu, pas anticipée ici.
+**Gouvernance multi-tenant / `create_tenant()`** : la « vraie gouvernance »
+qu'attendait le contournement provisoire de la Brique 3
+(`scripts/bootstrap_tenant_ne.sql`) existe désormais sous la forme de
+l'extension **Brique 1 V2** (gouvernance des tenants par CLI), validée le
+6 septembre 2026, après que le périmètre de la Brique 8 a été confirmé
+strictement limité à Audit + Human-in-the-loop. Restent **hors périmètre et
+non positionnés** : un rôle « Platform Operator » et la création de tenant
+par interface web, différés jusqu'à un besoin réel (approche de la Phase 2,
+premier export UEMOA). Leur place exacte reste à trancher explicitement le
+moment venu, pas anticipée ici.
 
 **Décision pendante non actée** : le marqueur `py.typed` manquant sur
-la Brique 2 (découvert lors de la Brique 7, contourné localement une
-seconde fois par la Brique 8) — toujours non corrigé sans décision
-explicite du fondateur.
+la Brique 2 (découvert lors de la Brique 7, contourné localement par les
+Briques 7 et 8 et par `souverain_app`) — toujours absent du dépôt à la date du
+30 octobre 2026, non corrigé sans décision explicite du fondateur.
 
 ## Méthode
 
