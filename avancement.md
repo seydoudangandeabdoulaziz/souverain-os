@@ -45,8 +45,8 @@ VALIDÉE
 | 4 | Prometheus/Grafana | **VALIDÉE** (4a + 4b) |
 | 5 | Test de charge du pipeline actuel | **VALIDÉE** |
 | 6 | Ollama/Mistral (→ Ministral 3 8B, voir détail) | 6a VALIDÉE (20 octobre 2026), 6b **VALIDÉE** le 30 octobre 2026 par le fondateur — lot v2 sans échec bloquant, suite complète 486/486, vérifications avec de vraies sessions (`analyst`, `auditor`) ; réserves ouvertes, voir le détail |
-| 7 | Sécurité IA/RAG (conception) | NON COMMENCÉE |
-| 8 | RAG | NON COMMENCÉE |
+| 7 | Sécurité IA/RAG (conception du MVP RAG) | **VALIDÉE par le fondateur** — conception et périmètre fonctionnel/sécuritaire uniquement ; réserves conservées |
+| 8 | RAG | NON COMMENCÉE — autorisation distincte requise |
 | 9 | Redis/Celery (conditionnel à l'étape 5) | NON COMMENCÉE |
 | 10 | SOUVERAIN-ID complet | NON COMMENCÉE |
 | 11 | PQC (ML-KEM + ML-DSA) | NON COMMENCÉE |

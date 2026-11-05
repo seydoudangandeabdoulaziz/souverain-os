@@ -1,6 +1,6 @@
 # ADR-008 — Sécurité IA/RAG : cadre de conception de l'étape 7
 
-**Statut : Proposé (4 novembre 2026, révision 2). Non accepté tant que le fondateur n'a pas validé.**
+**Statut : Conception de l'étape 7 validée par le fondateur le 4 novembre 2026 pour le périmètre du MVP RAG ; protocole V8 approuvé comme référence expérimentale. Les propositions techniques non approuvées ci-dessous restent des propositions ; cette validation n'autorise pas l'étape 8.**
 **Décideur : Seydou Dangande Abdoul Aziz (fondateur).**
 **Emplacement : `docs/adr/ADR-008-securite-ia-rag.md`** (les ADR du dépôt vivent dans `docs/adr/`, de ADR-000 à ADR-007).
 **Contexte : Étape 7, conception uniquement.** Complète ADR-004 (modèle), ADR-006 (déploiement) et ADR-007 (explication des alertes). S'appuie sur ADR-005 (provisionnement) et ADR-003 (intégrité).
@@ -18,69 +18,70 @@ Cet ADR fixe le cadre de sécurité avant toute implémentation.
 
 ## Statut des décisions
 
-- **D1, D3, D6 : orientations déjà validées** par le fondateur (4 novembre 2026).
-- **D2, D4, D5, D7, D8, D9, D10 : propositions soumises à sa validation.**
-- Les précisions techniques de la révision 2 détaillent les orientations validées ; elles restent à relire.
+- **D1 et D3 :** seul le périmètre borné par la section 10 des décisions verrouillées est approuvé : MVP sans LLM et corpus public commun sans collections privées par tenant. Les propositions historiques détaillées ci-dessous sur le classement par modèle et les collections privées restent hors MVP et non autorisées.
+- **D6 :** orientation POST + CSRF validée pour les actions concernées ; ses détails d'application restent soumis aux critères de conception et d'implémentation applicables.
+- **D2 :** le principe fonctionnel de requête serveur construite depuis une liste fermée est approuvé par la section 10 ; la correspondance canonique reste à détailler techniquement. **D4, D5, D7 et D10 : propositions techniques non approuvées. D8 et D9 : propositions historiques conservées, hors MVP et non autorisées.**
+- Les précisions techniques de cet ADR restent des propositions sauf lorsqu'elles reprennent explicitement une décision bornée du fondateur.
 
 ## Décision
 
 | # | Décision | Statut |
 |---|---|---|
-| **D1** | **Sélection d'identifiants.** Le serveur affiche les passages **verbatim** avec leur source ; un modèle éventuel ne peut qu'**ordonner** les k passages récupérés (permutation exacte), jamais en exclure ni en rédiger. Livraison initiale : **recherche seule, sans modèle** ; le modèle n'entre que sur gain mesuré. *Précisions :* passages transmis comme **données structurées** avec **jetons opaques par requête**, jamais concaténés à la consigne ; confinement par **contrat de sortie** (objet JSON à une clé, exactement k jetons connus, sans doublon, sans ajout ni omission, aucun texte hors JSON) ; **sortie invalide = aucune relance, repli sur l'ordre de pertinence**, sortie brute jamais affichée ni journalisée. | Validée |
-| **D2** | **Requête construite par le serveur** à partir des types de patterns (vocabulaire fermé). Pas de question libre en MVP. | Proposée |
-| **D3** | **Une collection publique (classe A, lecture seule) + une collection par tenant** pour tout corpus de tenant (Vision). Module d'accès unique. *Précisions :* l'isolation en mode embarqué de ChromaDB est **une discipline du code, pas une barrière** ; magasin public **immuable**, vérifié au démarrage (**échec = RAG indisponible**) ; limites du système de fichiers assumées en développement. | Validée |
+| **D1** | **Périmètre approuvé du MVP : recherche seule, sans LLM**, conformément aux décisions verrouillées §10. **Proposition historique hors MVP et non autorisée :** sélection d'identifiants permettant à un modèle d'ordonner les k passages par permutation exacte, avec contrat JSON strict, aucune rédaction ni omission, et repli déterministe en cas d'échec. Cette évolution exige une décision distincte du fondateur ; les précisions de sécurité associées ne sont pas une autorisation d'implémentation. | Approuvé uniquement dans le périmètre §10 ; proposition LLM non autorisée |
+| **D2** | **Principe approuvé par la section 10 :** requête construite par le serveur depuis la liste fermée des types de patterns ; pas de question libre en MVP. La table détaillée de correspondance entre types et requêtes canoniques reste une précision technique à définir. | Principe approuvé ; correspondance technique à préciser |
+| **D3** | **Périmètre approuvé du MVP :** collection documentaire publique commune ; aucune collection privée par tenant, conformément aux décisions verrouillées §10. **Proposition historique hors MVP et non autorisée :** collection distincte par tenant pour un éventuel corpus privé. Les constats sur les limites de l'isolation Chroma embarquée et les propositions de contrôle du magasin public restent des éléments techniques à évaluer, pas des décisions définitives. | Approuvé uniquement dans le périmètre §10 ; collections privées non autorisées |
 | **D4** | **Embeddings dans l'application**, modèle local multilingue (français inclus), version figée, **mesuré avant d'être retenu**. Pas dans Ollama (`MAX_LOADED_MODELS=1`). | Proposée |
 | **D5** | **Ingestion par commande d'opérateur** uniquement ; manifeste de provenance obligatoire ; journal d'ingestion en insertion seule distinguant l'**acteur déclaré** (non authentifié) de l'**utilisateur système observé** ; option : refus d'un manifeste dont le dernier commit n'est pas signé. L'authentification forte de l'opérateur n'est pas fournie (même limite que la gouvernance CLI). | Proposée |
 | **D6** | **Génération en POST avec CSRF double-submit** (motif de la Brique 8) ; le fragment du bouton reste un GET sans effet. | Validée |
-| **D7** | **Refus rapide au lieu d'une file sans borne**, quotas, cache par empreinte, sans Redis. **Le sémaphore en mémoire ne vaut que pour un seul processus** (cas actuel). Recommandé : **verrou consultatif PostgreSQL** (valable multi-processus) et quotas comptés sur le journal de D8. | Proposée |
-| **D8** | **Journal en deux couches** : ligne opérationnelle (logger dédié) + **table d'audit par tenant en insertion seule** (rôle dédié), identifiant utilisateur **pseudonyme**, jamais de contenu ni d'IP. Durée de conservation **non fixée** (dépend du texte légal en vigueur). | Proposée |
-| **D9** | **Snapshot en insertion seule** : faits, ordre, versions, **texte rendu** et son empreinte ; consultation par `auditor` et `admin`. **Le texte est stocké** (la reconstruction par le code n'est pas fidèle si les gabarits évoluent) ; l'état au moment de la génération est distingué de l'état courant. Positionnement (8c) à décider. | Proposée |
+| **D7** | **Proposition non approuvée :** refus rapide, quotas et cache sans Redis ; sémaphore en mémoire limité au mono-processus actuel ; option de verrou consultatif PostgreSQL pour la concurrence. La proposition historique de compter les quotas sur le journal durable D8 est exclue du MVP : le lot 8a ne dépend d'aucune table d'audit durable ni de snapshot. Toute stratégie de quotas/concurrence reste à arbitrer sans rendre D8/D9 prérequis. | Proposée ; dépendance à D8 exclue du MVP |
+| **D8** | **Proposition historique hors MVP et non autorisée :** journal opérationnel dédié plus table d'audit par tenant en insertion seule, identifiant pseudonyme, sans contenu ni IP ; durée de conservation non définie. La section 10 exclut toute nouvelle table d'audit durable du MVP ; la journalisation MVP est minimisée. Toute reprise nécessite une décision distincte du fondateur. | Hors MVP ; non autorisée |
+| **D9** | **Proposition historique hors MVP et non autorisée :** snapshot en insertion seule comprenant faits, ordre, versions, texte rendu et empreinte, consultable par `auditor` et `admin`. La section 10 exclut snapshots et conservation durable supplémentaire du MVP. Toute reprise nécessite une décision distincte du fondateur et ne modifie pas ADR-007 rétroactivement. | Hors MVP ; non autorisée |
 | **D10** | **Visibilité du dépôt** à confirmer par le fondateur ; aucune intention déduite. | Proposée |
 
 ## Options considérées
 
-- **D1.** (a) recherche seule : premier lot. (c) rédaction libre contrôlée : écartée, expose à l'injection et à la fausse autorité : **Vision**.
-- **D3.** (A) collection globale + filtre `tenant_id` : écartée. (C) un store par tenant : écartée. (D) pgvector par schéma de tenant : **réouvrable**, mais contredit la stack imposée et exigerait une décision explicite (cahier des charges §3).
+- **D1 — options historiques, hors MVP et non autorisées :** (a) recherche seule ; (c) rédaction libre contrôlée, écartée dans la proposition historique car elle expose à l'injection et à la fausse autorité. Le MVP approuvé reste sans aucun LLM.
+- **D3 — options historiques pour une évolution future, non autorisées dans le MVP :** (A) collection globale + filtre `tenant_id` ; (C) un store par tenant ; (D) pgvector par schéma de tenant. Aucune option de collection privée n'est approuvée ; toute reprise exigerait une décision explicite.
 - **D6.** (b) rester en GET avec contrôle `Sec-Fetch-Site` : dépend du navigateur. (c) accepter le risque : écartée.
 - **D7.** Option 1 (sémaphore en mémoire) vs option 2 (verrou consultatif PostgreSQL), voir ci-dessus.
-- **D9.** Ne rien stocker ; stocker le texte seul sans instantané ; stocker l'instantané **sans** le texte (proposition de la révision 1, **abandonnée**).
+- **D9 — options historiques, hors MVP et non autorisées :** ne rien stocker ; stocker le texte seul sans instantané ; stocker l'instantané **sans** le texte (proposition de la révision 1, **abandonnée**). Aucun de ces choix n'autorise une conservation dans le MVP.
 
 ## Justification
 
-- **D1.** Conserve l'esprit de l'ADR-007 : le modèle ne peut ni inventer ni modifier ce qui est affiché. La séparation par structure ne garantit pas que le modèle ignore un texte injecté ; la protection est le **confinement** par le contrat de sortie. Précision assumée : le modèle lit du texte de corpus public (non sensible), contrairement à la 6b.
-- **D3.** Reprend la discipline du point de passage unique de la Brique 6. La documentation de ChromaDB présente le `PersistentClient` comme destiné au développement et aux tests ; un mode serveur authentifié est à décider avant toute mise en production.
+- **D1 — justification de la proposition historique, non applicable au MVP :** le confinement par contrat de sortie visait à limiter les capacités d'un éventuel modèle ordonnateur. Cette proposition reste non autorisée ; aucun texte documentaire n'est transmis à un LLM dans le MVP.
+- **D3 — constat et proposition technique à évaluer :** la documentation de ChromaDB présente le `PersistentClient` comme destiné au développement et aux tests ; un mode serveur authentifié est requis avant toute exploitation opérationnelle le nécessitant, conformément à la section 10.
 - **D6.** Ferme le risque du site tiers et empêche que la traçabilité attribue à un utilisateur une action qu'il n'a pas faite.
-- **D9.** L'alerte est mise à jour en place ; sans instantané, un audit relirait d'autres faits. Le texte est stocké parce que le gel garantit l'identité du texte **seulement tant que le code ne change pas**.
+- **D9 — justification historique non adoptée :** l'argument en faveur d'un snapshot était que l'alerte est mise à jour en place. Cette motivation ne lève pas l'interdiction du MVP ; tout stockage futur nécessite une décision distincte.
 
 ## Compatibilité vérifiée avec les décisions antérieures
 
 Vérification faite sur lecture des ADR-000, 002, 006 et 007 **en entier**, et des sections « Décision » des ADR-001, 003, 004, 005. Détail dans `docs/ETAPE_7_CONCEPTION.md` §5.
 
-**Contradictions apparentes, arbitrage requis :**
+**Compatibilité et périmètre approuvé :**
 
-1. **ADR-006 §3** (« Aucun agent autonome, RAG ou génération de requêtes SQL/Cypher n'est introduit »), **décisions verrouillées §8 et §9** (« sans RAG »), ADR-007 : introduire un RAG contredit la lettre de ces invariants, rédigés pour la 6a/6b. **Proposition :** une nouvelle section 10 des décisions verrouillées dédiée au RAG, sans modifier les sections 8 et 9 (modification réservée au fondateur).
-2. **ADR-007, décision du 29 octobre** (« aucune migration ni stockage d'explications ») : D9 introduit un stockage. L'ADR-007 le qualifie de « chantier distinct, place non décidée » : c'est une **nouvelle décision**, à valider explicitement.
-3. **Document fondateur, Bloc 11** (« RAG < 2 s ») : incompatible avec une génération (8 à 12 s à chaud) ; tenable pour la recherche seule.
+1. La **section 10 des décisions verrouillées** approuve le MVP RAG documentaire dans un périmètre précis. Elle ne modifie pas rétroactivement ADR-006, ADR-007 ni les sections 8 et 9 des décisions verrouillées, qui conservent leur portée historique 6a/6b.
+2. **ADR-007** et les décisions verrouillées §9 ne sont pas modifiés : D8 et D9 restent des propositions historiques hors MVP et non autorisées ; aucune table d'audit durable ni aucun snapshot n'est introduit par le lot 8a.
+3. La cible de performance concerne la **recherche seule** : le protocole V8 de `docs/ETAPE_7_CONCEPTION.md` §2 fixe dix échauffements exclus, puis cent mesures par chacun des cinq types de patterns ; le p95 est calculé séparément par type avec la méthode du rang le plus proche (rang 95 sur 100). Les résultats incluent l'environnement matériel et logiciel, la version du corpus et les conditions d'exécution. La mesure réelle est réalisée au lot 8a ; l'objectif est un p95 strictement inférieur à deux secondes pour chacun des cinq types. Aucune mesure réelle n'est exigée pour valider l'étape 7.
 4. **Document fondateur, Bloc 8** (« Loi 2019-33 — protection des données ») : la loi 2019-33 porte sur la cybercriminalité (voir points à vérifier).
 
-**Compatible sous condition :** ADR-000 (emplacement du code RAG non défini ; dépendances dans le `pyproject.toml` du paquet concerné) ; ADR-002 (moteur de traduction futur non budgété en mémoire) ; **ADR-003** (le mécanisme d'intégrité n'est **pas réutilisable** sans modifier la Brique 1 : l'event trigger de la migration `0004` limite les noms de table à `alertes` et `detections`) ; ADR-005 (leçon appliquée : provisionnement, pas seulement migration) ; ADR-007 (journal des replis gelé inchangé, journal distinct pour D8 ; la Brique 7 n'est pas modifiée de nouveau) ; document fondateur Bloc 5 règle 3 (`tenant_id`, `country_code`, `data_classification` dans chaque nouvelle table) ; Bloc 6 (rôle de **LlamaIndex** non tranché).
+**Compatible sous condition :** ADR-000 (emplacement du code RAG non défini ; dépendances dans le `pyproject.toml` du paquet concerné) ; ADR-002 (moteur de traduction futur non budgété en mémoire) ; **ADR-003** (le mécanisme d'intégrité n'est **pas réutilisable** sans modifier la Brique 1 : l'event trigger de la migration `0004` limite les noms de table à `alertes` et `detections`) ; ADR-005 (leçon appliquée : provisionnement, pas seulement migration) ; ADR-007 (journal des replis gelé inchangé ; aucune table D8 ni snapshot D9 n'est autorisé dans le MVP) ; document fondateur Bloc 5 règle 3 (`tenant_id`, `country_code`, `data_classification` dans chaque nouvelle table, si une évolution future est autorisée) ; Bloc 6 (LlamaIndex reste dans la stack déclarée, mais son rôle technique demeure une proposition à évaluer).
 
-**Compatibles :** ADR-001, ADR-004, décisions verrouillées §1 à §7.
+**Compatibles :** ADR-001, ADR-004, décisions verrouillées §1 à §7 et §10 dans son périmètre approuvé.
 
 ## Conséquences
 
-- **Aucun fichier gelé n'est modifié** : `explication_ia.py`, `traductions/fr.py`, prompt système, options, `lot_v2.json`, `termes_interdits_v1.json`. Nouveaux textes dans un **catalogue propre au RAG**. Journal D8 **distinct** du journal des replis. `tests/test_gel_lot_v2.py` doit continuer à passer.
+- **Aucun fichier gelé n'est modifié** : `explication_ia.py`, `traductions/fr.py`, prompt système, options, `lot_v2.json`, `termes_interdits_v1.json`. Nouveaux textes dans un **catalogue propre au RAG**. Aucun journal durable D8 ni snapshot D9 dans le MVP. `tests/test_gel_lot_v2.py` doit continuer à passer.
 - **Correction post-validation de la 6b** (D6) : `explication_routes.py` (non gelé), le fragment du bouton et les tests de la route seront modifiés à l'étape 8. À tracer comme telle.
 - **Briques 4, 5 et 6 intouchées.** Aucune donnée opérationnelle n'est indexée.
 - **Un lot de validation RAG v1**, distinct du lot v2, sera construit à l'étape 8.
-- **Toute nouvelle table par tenant et tout nouveau rôle** sont créés par un provisionnement diagnostiqué et idempotent (ADR-005), et portent `tenant_id`, `country_code`, `data_classification`.
+- Toute nouvelle table ou tout nouveau rôle ne pourrait être créé, pour une évolution future explicitement autorisée, que par un provisionnement diagnostiqué et idempotent (ADR-005), avec les champs requis (`tenant_id`, `country_code`, `data_classification`) lorsqu'applicables. Aucune table D8/D9 n'est créée par le MVP.
 - **Mémoire.** Les **mesures** disponibles (Ministral 6,284 à 6,618 Gio selon la mesure ; PostgreSQL, Neo4j, Prometheus, Grafana) sont distinguées des **hypothèses** (application, magasin vectoriel, embeddings), qui n'ont **jamais été mesurées**. La projection de ~9,6 à ~11,1 Gio est **indicative, pas une mesure** ; une mesure réelle est requise avant l'étape 8. Les trois mesures de Ministral ne sont pas réconciliées (ADR-006 §8).
 - **Corpus.** Aucun document n'est ingéré avant vérification de sa licence : FATF et GIABA exigent une **autorisation écrite préalable** (mentions constatées sur des publications types) ; UNODC autorise un usage non commercial avec attribution (usage commercial à clarifier) ; BCEAO : aucune condition trouvée.
 
 ## Points non couverts
 
-- Version de ChromaDB et modèle d'embeddings (étape 8, après vérification et mesure) ; rôle de LlamaIndex.
-- Valeurs numériques des quotas ; durée de conservation des journaux et snapshots.
+- Version de ChromaDB et modèle d'embeddings (étape 8, après vérification et mesure) ; rôle de LlamaIndex, qui reste une proposition technique à évaluer.
+- Valeurs numériques des quotas ; toute durée de conservation future pour des journaux ou snapshots, qui restent hors MVP et non autorisés.
 - Mode serveur authentifié de ChromaDB, chiffrement au repos, séparation des utilisateurs système, authentification forte de l'opérateur d'ingestion : **Vision**.
 - Écoute de l'application sur toutes les interfaces (`0.0.0.0`) et sauvegardes non chiffrées : hors périmètre, signalés.
 - Positionnement du sous-lot de snapshots (8c).
@@ -96,11 +97,11 @@ Vérification faite sur lecture des ADR-000, 002, 006 et 007 **en entier**, et d
 
 ## Arbitrages demandés
 
-A1 (portée du « sans RAG ») ; A2 (D2, D4, D5, D7, D8, D9, D10 et leurs options) ; A3 (LlamaIndex) ; A4 (licences) ; A5 (référence juridique) ; A6 (emplacement du code RAG) ; A7 (protection des nouvelles tables : migration Brique 1 ou protection propre) ; A8 (écoute `0.0.0.0`) ; A9 (baseline RAG) ; A10 (chiffrement du disque, sauvegardes) ; A11 (ChromaDB embarqué puis serveur). Détail dans `docs/ETAPE_7_CONCEPTION.md` §18.
+A1 (traité dans le périmètre de la section 10 approuvée ; aucune modification historique) ; A2 (D4, D5, D7, D10 et leurs options ; D2 fonctionnel approuvé, détail technique à préciser ; D8/D9 explicitement hors MVP et non autorisés) ; A3 (évaluer le rôle technique de LlamaIndex, sans décision définitive) ; A4 (licences) ; A5 (référence juridique) ; A6 (emplacement du code RAG) ; A7 (protection des nouvelles tables si une évolution future est autorisée) ; A8 (écoute `0.0.0.0`) ; A9 (protocole V8 approuvé comme référence expérimentale ; mesure réelle au lot 8a, objectif p95 < 2 s par type) ; A10 (chiffrement du disque, sauvegardes) ; A11 (ChromaDB embarqué puis serveur). Détail dans `docs/ETAPE_7_CONCEPTION.md` §18.
 
 ## Références
 
 - `docs/ETAPE_7_CONCEPTION.md` (menaces T1–T14, exigences S1–S15, corpus, mémoire, dépendances, arbitrages).
 - ADR-000 à ADR-007.
 - `docs/ETAPE_6B_BILAN.md` §6 ; `docs/etape_6b_donnees/gel_v2.json`.
-- `00_DECISIONS_VERROUILLEES.md`, sections 1 à 9.
+- `docs/00_DECISIONS_VERROUILLEES.md`, sections 1 à 10 ; les sections 8 et 9 restent historiques et inchangées.

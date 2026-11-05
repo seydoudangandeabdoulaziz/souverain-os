@@ -48,15 +48,24 @@ Ordre consolidé après la revue d'architecture des 6 et 7 septembre 2026.
 | 4 | Prometheus/Grafana | **Validée** (4a et 4b, 19 septembre 2026) |
 | 5 | Test de charge du pipeline actuel | **Validée** (19 septembre 2026) |
 | 6 | Ollama/Mistral (→ Ministral 3 8B) | 6a **validée** (20 octobre 2026), 6b **validée** (30 octobre 2026) |
-| 7 | Sécurité IA/RAG (conception) | Non commencée |
-| 8 | RAG | Non commencée |
+| 7 | Sécurité IA/RAG (conception du MVP RAG) | Validée par le fondateur — conception et périmètre uniquement ; réserves conservées |
+| 8 | RAG | Non commencée — autorisation distincte requise |
 | 9 | Redis/Celery (conditionnel à l'étape 5) | Non commencée |
 | 10 | SOUVERAIN-ID complet | Non commencée |
 | 11 | PQC (ML-KEM + ML-DSA) | Non commencée |
 | 12 | Résilience inter-États (conception) | Non commencée |
 
-Aucune étape 6C n'existe. L'étape 7 ne démarre que sur demande explicite du
-fondateur.
+Aucune étape 6C n'existe. Le fondateur a validé la conception de l'étape 7
+dans le seul périmètre du MVP RAG et sous réserve des sujets reportés aux étapes
+correspondantes. L'étape 8 reste non commencée et n'est pas autorisée ; son
+implémentation exige une autorisation distincte.
+
+Pour le RAG, l'objectif approuvé est un p95 de recherche strictement inférieur
+à deux secondes pour chacun des cinq types de patterns, indépendamment de toute
+génération par LLM. L'étape 7 définit et valide le protocole reproductible ; la
+mesure réelle est réalisée au lot 8a de l'étape 8 selon ce protocole, avant
+l'acceptation de ce lot. L'absence de mesure réelle à l'étape 7 ne constitue
+pas un échec de cette étape.
 
 **Note — changement de modèle LLM (7 octobre 2026)** : le libellé
 « Ollama/Mistral » (étape 6) désigne désormais **Ministral 3 8B
