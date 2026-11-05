@@ -1,14 +1,16 @@
 # Contribuer à SOUVERAIN-OS
 
+Les règles destinées aux agents IA et la hiérarchie documentaire sont dans [`AGENTS.md`](./AGENTS.md). Les décisions d'architecture faisant autorité restent dans les décisions verrouillées et les ADR approuvés.
+
 ## Principe général
 
-Une seule brique à la fois. Séquence obligatoire :
+Une seule brique ou un seul chantier transverse autorisé à la fois. Séquence de travail :
 
 ```text
 COMPRENDRE → ARCHITECTURER → VALIDER → IMPLÉMENTER → TESTER → DOCUMENTER → VALIDER → BRIQUE SUIVANTE
 ```
 
-Aucune brique suivante n'est commencée sans validation explicite du fondateur sur la brique précédente.
+Aucune brique ou étape suivante n'est commencée sans validation explicite du fondateur lorsque le processus du projet l'exige.
 
 ## Conventions de commit
 
@@ -27,11 +29,13 @@ test(brique-01): ajouter les tests de persistence
 - Python 3.12+ strict, type hints obligatoires, async partout où pertinent.
 - Commentaires en français, uniquement lorsqu'ils apportent une vraie valeur pédagogique (pas de commentaires redondants avec le code).
 - Nommage des variables/fonctions en anglais, `snake_case`.
-- Chaque brique a son propre `pyproject.toml` et son lockfile (workspace `uv`, Option A).
-- Tests obligatoires pour toute brique livrée.
+- Chaque brique ou paquet transverse déclare ses dépendances dans son propre `pyproject.toml` ; l'unique `uv.lock` à la racine centralise la résolution et le verrouillage (workspace `uv`, Option A).
+- Tests requis avant livraison d'une brique ou d'un paquet transverse, selon le plan de validation approuvé.
 - Secure by Design, EBIOS Risk Manager, zero-trust entre microservices.
 
 ## Qualité avant commit
+
+Ces commandes décrivent les contrôles habituels des contributeurs. Les agents IA ne les exécutent que si la mission l'autorise et sur le périmètre concerné. `ruff format` modifie les fichiers.
 
 ```bash
 uv run ruff check .
@@ -60,4 +64,4 @@ Ne pas créer de fichiers ou dossiers dont la nécessité n'est pas démontrée.
 
 ## Branches
 
-Une branche par brique. Exemple : `brique-01-postgresql`.
+Une branche par brique ou par chantier transverse autorisé. Exemple : `brique-01-postgresql`.

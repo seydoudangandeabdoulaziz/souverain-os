@@ -63,7 +63,7 @@ uv run python scripts/healthcheck_env.py
 ## Contraintes non négociables
 
 - 100 % open source et auditable.
-- Inférence IA locale (Ollama) — aucune donnée ne quitte le territoire national.
+- Les fonctions LLM autorisées utilisent une inférence locale (Ollama) ; le MVP RAG approuvé est sans LLM et utilise des embeddings locaux. Aucune donnée sensible ne dépend d'un service cloud externe.
 - Multi-tenant natif dès le départ.
 - Validation de la faisabilité mémoire avant chaque brique.
 - Distinction explicite MVP / Vision pour chaque composant.
@@ -78,6 +78,7 @@ uv run python scripts/healthcheck_env.py
 ## Contribuer
 
 Voir [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+Les agents IA doivent également consulter [`AGENTS.md`](./AGENTS.md) selon les modalités qui y sont précisées.
 
 ## Sécurité
 

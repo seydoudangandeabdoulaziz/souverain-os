@@ -18,7 +18,7 @@ Toute estimation mémoire de brique doit être évaluée par rapport à ces 16 G
 2. Gestion des dépendances — Option A : workspace uv
 Un pyproject.toml à la racine du repository.
 Un pyproject.toml propre à chaque brique, sous briques/brique_XX_nom/.
-Dépendances isolées par brique, versions verrouillées (lockfile par brique).
+Dépendances déclarées par brique ; résolution et verrouillage centralisés dans l'unique `uv.lock` à la racine du workspace.
 Aucune dépendance inutile installée globalement au niveau racine.
 Cette option respecte l'exigence du document fondateur (Bloc 14) : « chaque brique a son propre requirements.txt fixé », adaptée à l'écosystème uv.
 3. Reconstruction Greenfield
@@ -241,7 +241,11 @@ Toute évolution qui transmettrait des passages à un composant IA devra faire l
 
 ### Architecture et fonctionnement
 
-Le composant RAG est dédié et respecte le workspace `uv`, les limites entre briques et le sens des dépendances existantes. LlamaIndex reste dans la stack déclarée du projet. Les embeddings fonctionnent localement ; aucun modèle d’embedding n’est retenu sans évaluation préalable de sa qualité, de sa consommation mémoire, de ses performances et de sa licence.
+Le composant RAG est dédié et respecte le workspace `uv`, les limites entre briques et le sens des dépendances existantes. Pour le MVP, LlamaIndex n’est pas une dépendance obligatoire. Le paquet `rag/` privilégie un pipeline RAG Python autonome, sans framework RAG généraliste, composé de composants ciblés pour l’ingestion et l’extraction documentaire, le découpage déterministe, les embeddings locaux, l’indexation, la recherche vectorielle et la restitution de passages sourcés.
+
+Chaque dépendance doit répondre à un besoin concret et démontrer sa valeur technique. Toute introduction ultérieure de LlamaIndex devra être justifiée et faire l’objet d’un arbitrage explicite du fondateur.
+
+Ce pipeline sera intégré au workspace existant et exécuté dans l’environnement Docker de SOUVERAIN-OS. Les embeddings fonctionnent localement ; aucun modèle d’embedding n’est retenu sans évaluation préalable de sa qualité, de sa consommation mémoire, de ses performances et de sa licence.
 
 ChromaDB en mode embarqué est réservé aux tests et au développement contrôlés. Avant toute exploitation opérationnelle nécessitant le magasin vectoriel, un mode serveur authentifié est requis. Ce serveur doit être protégé contre les accès non autorisés ; il ne peut pas être directement exposé au réseau sans contrôle d’accès adapté.
 
@@ -263,7 +267,7 @@ Cette décision ne vaut pas validation des licences de toutes les sources, véri
 
 ### Conditions de validation de l’étape 7
 
-La présente section ne déclare pas l’étape 7 validée et n’autorise pas l’étape 8. La validation de l’étape 7 exige des critères vérifiables et des preuves portant au minimum sur :
+**Mise à jour du statut (4 novembre 2026) :** la conception de l’étape 7 a été validée par le fondateur pour le périmètre fonctionnel et sécuritaire du MVP RAG. Cette validation ne vaut pas autorisation de l’étape 8, qui requiert une décision distincte. La validation de l’étape 7 exige des critères vérifiables et des preuves portant au minimum sur :
 
 1. le respect du périmètre documentaire autorisé ;
 2. l’absence de données opérationnelles dans le corpus, les embeddings et les journaux ;

@@ -90,7 +90,7 @@ Verdicts : **C** = compatible ; **CC** = compatible sous condition ; **⚠** = c
 
 | Référence | Section | Verdict | Détail |
 |---|---|---|---|
-| ADR-000 | Décision (workspace `uv`, méthode, dépendances signalées) | **CC** | Toute nouvelle dépendance (magasin vectoriel, embeddings) va dans le `pyproject.toml` du paquet concerné, avec lockfile racine. **L'emplacement du code RAG (nouvelle brique ou module transverse) n'est défini nulle part** : arbitrage A6. |
+| ADR-000 | Décision (workspace `uv`, méthode, dépendances signalées) | **C** | Le paquet transverse `rag/` possède son `pyproject.toml` ; la résolution et le verrouillage des dépendances restent centralisés dans l'unique `uv.lock` racine (arbitrage n°1). L'emplacement `rag/` est validé par l'arbitrage n°2. |
 | ADR-001 | Décision, Conséquences | **C** | Catalogue propre, aucun texte en dur. Aucune traduction automatique en temps réel : les passages sont affichés **dans leur langue d'origine** (une partie du corpus GAFI/GIABA est en anglais). Langues locales : Vision. |
 | ADR-002 | Décision | **CC** | Moteur de traduction futur (NLLB-200 600M) **non inclus dans le budget mémoire** de ce document. La dépendance `transformers` pourrait être partagée avec les embeddings : à évaluer à l'étape 8. Aucune interaction fonctionnelle (composant distinct d'Ollama). |
 | ADR-003 | Décision | **CC** | **Le mécanisme n'est pas réutilisable tel quel** : l'event trigger de la migration `0004` limite les noms de table à `alertes` et `detections`, et `shared.assurer_protection_integrite(p_schema, p_table)` branche sur ces noms. Protéger les nouvelles tables (D8, D9) exige soit une migration **dans la Brique 1 (verrouillée)**, soit une protection propre au nouveau module : arbitrage A7. |
@@ -109,7 +109,7 @@ Verdicts : **C** = compatible ; **CC** = compatible sous condition ; **⚠** = c
 | Document fondateur | Bloc 5, règle 3 : `tenant_id`, `country_code`, `data_classification` dans **chaque** table | **CC** | S'appliquerait à toute table D8/D9 seulement si une évolution future était approuvée ; aucune table de ce type n'est autorisée dans le MVP. |
 | Document fondateur | Bloc 5, règle 2 : aucune donnée ne quitte le territoire | **C** | Embeddings et recherche locaux. |
 | Document fondateur | Bloc 5, règle 6 : fallback pour chaque composant | **C** | RAG indisponible = mode dégradé sans recherche (D3, D5). |
-| Document fondateur | Bloc 6 : stack **LlamaIndex + ChromaDB** | **CC** | LlamaIndex est conservé dans la stack conformément à la section 10. Son rôle technique (proposition : couche locale d'intégration ingestion/retrieval avec ChromaDB, sans autorité sur accès, tenant ou requêtes) reste à évaluer ; aucune dépendance nouvelle n'est autorisée par cette formulation. |
+| Document fondateur | Bloc 6 : stack **LlamaIndex + ChromaDB** | **CC** | L'amendement approuvé de la section 10 précise que LlamaIndex n'est pas obligatoire pour le MVP et que `rag/` privilégie un pipeline Python autonome sans framework RAG généraliste. Toute dépendance doit répondre à un besoin concret et démontrer sa valeur ; toute introduction ultérieure de LlamaIndex requiert un arbitrage explicite. Le pipeline rejoint le workspace existant et s'exécute dans l'environnement Docker SOUVERAIN-OS. |
 | Document fondateur | Bloc 11 : « RAG < 2 s » ; Bloc 8 : « Loi 2019-33 (protection des données) » | **⚠** | V8 et V1. |
 | Cahier des charges | §3 stack obligatoire sauf décision explicite ; §7 ne pas inventer d'exigences | **CC** | Les exigences S1–S15 sont des **exigences de conception proposées**, rattachées aux principes de `05_SECURITE_ET_GOUVERNANCE.md` (Secure by Design, zero trust, audit, pseudonymisation, chiffrement, fallback), pas des exigences du fondateur. |
 | `05_SECURITE_ET_GOUVERNANCE.md` / `SECURITY.md` | Chiffrement au repos ; « projet non encore déployé publiquement » | **CC / ⚠** | Le chiffrement au repos est un principe **non encore réalisé** (étape 11) : il resterait à traiter avant toute évolution future approuvée qui stockerait des snapshots. `SECURITY.md` et le fichier `LICENSE` (« confidentiel et propriétaire ») décrivent un dépôt non public : à rapprocher de l'état observé (V2, D10). |
@@ -496,7 +496,7 @@ La validation de l'étape 7 ne lève pas les réserves suivantes :
 
 1. Vérifier les droits de chaque source et les références juridiques avant toute ingestion.
 2. Évaluer puis sélectionner le modèle d'embedding avant son usage.
-3. Arrêter les choix techniques encore ouverts (notamment le rôle concret de LlamaIndex, les quotas/concurrence et l'emplacement du composant) avant l'implémentation correspondante.
+3. Arrêter les choix techniques encore ouverts, notamment le modèle d'embedding et les quotas/concurrence, avant l'implémentation correspondante. L'emplacement `rag/` et l'orientation de pipeline natif léger sont arbitrés ; ils ne lèvent pas les autres réserves.
 4. Protéger ChromaDB et les endpoints avant toute exploitation ou exposition réseau concernée.
 5. Traiter la visibilité et la licence du dépôt selon l'arbitrage D10.
 6. La mesure réelle V8 reste au lot 8a ; le protocole approuvé est sa référence expérimentale.
@@ -511,10 +511,10 @@ Les documents historiques de la 6a/6b et les sections 8 et 9 des décisions verr
 |---|---|
 | **A1** | **Traité dans le périmètre approuvé** : la section 10 autorise le MVP RAG documentaire sans modifier les décisions historiques 6a/6b ni les sections 8 et 9. |
 | **A2** | Arbitrer D4, D5 (dont le **durcissement par commit signé**), D7 (**option 1 ou 2**) et D10. Le principe fonctionnel D2 est approuvé par la section 10 ; son détail de correspondance canonique reste une tâche de conception technique. D8 (journal durable/chaînage) et D9 (snapshots) restent des propositions historiques hors MVP, non autorisées ; toute reprise future requiert une décision distincte. |
-| **A3** | LlamaIndex reste dans la stack. Évaluer la proposition de le limiter à une couche locale d'intégration ingestion/retrieval avec ChromaDB, sans autorité sur l'accès, le tenant ou la construction des requêtes. |
+| **A3** | **Arbitrage technique n°3 validé :** LlamaIndex n'est pas une dépendance obligatoire du MVP. `rag/` privilégie un pipeline RAG Python autonome, sans framework RAG généraliste, avec des composants ciblés ; chaque dépendance doit démontrer un besoin concret et sa valeur technique. Toute introduction ultérieure de LlamaIndex requiert un arbitrage explicite. Le pipeline est intégré au workspace et exécuté dans l'environnement Docker de SOUVERAIN-OS. |
 | **A4** | Licences : demander l'**autorisation écrite** au GAFI et au GIABA, ou **exclure** ces sources ; clarifier l'usage **commercial** UNODC ; rechercher les conditions BCEAO. |
 | **A5** | Corriger la **référence juridique** du document fondateur (après vérification sur texte officiel). |
-| **A6** | **Emplacement du code RAG** (nouvelle brique, ou module transverse) et organisation du workspace. |
+| **A6** | **Arbitrage technique n°2 validé :** paquet transverse `rag/`, indépendant des briques métier, avec son propre `pyproject.toml` et l'unique `uv.lock` à la racine. `souverain_app` assure l'assemblage et l'adaptateur de contrôle d'accès ; les Briques 7 et 8 conservent leurs responsabilités propres. |
 | **A7** | Protéger les nouvelles tables : **nouvelle migration dans la Brique 1** (verrouillée) ou protection propre au nouveau module. |
 | **A8** | **Écoute `0.0.0.0`** : restreindre, en tenant compte du scraping Prometheus en conteneur ? |
 | **A9** | **Séquencement approuvé :** le protocole est précisé au §2/V8, avec dix échauffements exclus puis cent mesures et un p95 calculé séparément par type ; effectuer au lot 8a la mesure réelle reproductible, avec un objectif p95 strictement inférieur à deux secondes pour chacun des cinq types. Aucune mesure réelle n'est exigée pour valider l'étape 7. |

@@ -6,8 +6,10 @@ Ce dossier documente l'architecture réelle et prévue de SOUVERAIN-OS.
 - Décisions d'architecture actées : voir [`decisions.md`](./decisions.md) et [`../adr/`](../adr/).
 - État réel d'implémentation : voir [`../../avancement.md`](../../avancement.md).
 
-## Distinction importante
+## Hiérarchie et état
 
-- **Architecture actuelle** : uniquement la Brique 0 (fondations, aucun service métier).
-- **Architecture future** : décrite à titre de cible dans `ARCHITECTURE.md`, non implémentée.
-- **Éléments non encore validés** : tout ce qui concerne les briques 1 à 8 et la phase transverse — décrit dans les documents de référence du projet, mais pas encore architecturé en détail via ADR.
+- **État opérationnel** : `avancement.md` fait foi pour les statuts ; une brique validée n'implique pas que ses services soient démarrés.
+- **Décisions du fondateur** : [`../00_DECISIONS_VERROUILLEES.md`](../00_DECISIONS_VERROUILLEES.md) fait autorité dans le périmètre de ses sections et arbitrages.
+- **Décisions d'architecture** : consulter les ADR en tenant compte de leur statut ; `decisions.md` n'en est qu'un résumé.
+- **Conception et cible** : `ARCHITECTURE.md`, les documents de conception et la roadmap décrivent les états réels ou futurs en les distinguant explicitement. Une cible non implémentée n'est pas une capacité opérationnelle ni une autorisation de commencer.
+- Les guides et prompts historiques sont subordonnés à ces sources. Si une référence citée est absente du dépôt, le signaler sans inférer son contenu ni la remplacer.
