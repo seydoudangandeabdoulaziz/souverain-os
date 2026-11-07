@@ -46,11 +46,13 @@ VALIDÉE
 | 5 | Test de charge du pipeline actuel | **VALIDÉE** |
 | 6 | Ollama/Mistral (→ Ministral 3 8B, voir détail) | 6a VALIDÉE (20 octobre 2026), 6b **VALIDÉE** le 30 octobre 2026 par le fondateur — lot v2 sans échec bloquant, suite complète 486/486, vérifications avec de vraies sessions (`analyst`, `auditor`) ; réserves ouvertes, voir le détail |
 | 7 | Sécurité IA/RAG (conception du MVP RAG) | **VALIDÉE par le fondateur** — conception et périmètre fonctionnel/sécuritaire uniquement ; réserves conservées |
-| 8 | RAG | NON COMMENCÉE — autorisation distincte requise |
+| 8 | RAG | **EN ANALYSE** — lot 8a.1, pilote comparatif d'embeddings exécuté ; sélection du modèle en attente du fondateur ; implémentation du moteur RAG non commencée et non autorisée |
 | 9 | Redis/Celery (conditionnel à l'étape 5) | NON COMMENCÉE |
 | 10 | SOUVERAIN-ID complet | NON COMMENCÉE |
 | 11 | PQC (ML-KEM + ML-DSA) | NON COMMENCÉE |
 | 12 | Résilience inter-États (conception) | NON COMMENCÉE |
+
+**État du lot 8a.1 (7 novembre 2026)** : le pilote comparatif `multilingual-e5-small` / `multilingual-e5-base` a été exécuté sur `fatf-word-v1.1` et les cinq requêtes canoniques. Les annotations et métriques restent provisoires et assistées par IA ; elles ne constituent pas une validation humaine experte. Le fondateur reste seul décisionnaire du choix de modèle. Aucun moteur RAG n'a été implémenté ; toute implémentation ultérieure requiert une autorisation distincte.
 
 ## Détail — Brique 0 (Fondations)
 

@@ -49,7 +49,7 @@ Ordre consolidé après la revue d'architecture des 6 et 7 septembre 2026.
 | 5 | Test de charge du pipeline actuel | **Validée** (19 septembre 2026) |
 | 6 | Ollama/Mistral (→ Ministral 3 8B) | 6a **validée** (20 octobre 2026), 6b **validée** (30 octobre 2026) |
 | 7 | Sécurité IA/RAG (conception du MVP RAG) | Validée par le fondateur — conception et périmètre uniquement ; réserves conservées |
-| 8 | RAG | Non commencée — autorisation distincte requise |
+| 8 | RAG | Lot 8a.1 — pilote comparatif exécuté ; sélection du modèle en attente. Implémentation RAG non commencée — autorisation distincte requise |
 | 9 | Redis/Celery (conditionnel à l'étape 5) | Non commencée |
 | 10 | SOUVERAIN-ID complet | Non commencée |
 | 11 | PQC (ML-KEM + ML-DSA) | Non commencée |
@@ -57,8 +57,10 @@ Ordre consolidé après la revue d'architecture des 6 et 7 septembre 2026.
 
 Aucune étape 6C n'existe. Le fondateur a validé la conception de l'étape 7
 dans le seul périmètre du MVP RAG et sous réserve des sujets reportés aux étapes
-correspondantes. L'étape 8 reste non commencée et n'est pas autorisée ; son
-implémentation exige une autorisation distincte.
+correspondantes. Le pilote expérimental du lot 8a.1 a été autorisé et exécuté ;
+ses évaluations restent provisoires et assistées par IA, et le choix du modèle
+reste à la décision du fondateur. L'implémentation du moteur RAG à l'étape 8
+n'a pas commencé et exige une autorisation distincte.
 
 Pour le RAG, l'objectif approuvé est un p95 de recherche strictement inférieur
 à deux secondes pour chacun des cinq types de patterns, indépendamment de toute
