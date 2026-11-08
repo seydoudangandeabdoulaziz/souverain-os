@@ -65,6 +65,12 @@ l'implémentation de l'étape 8. Le socle technique est désormais validé sur
 données synthétiques ; les publications FATF restent exclues jusqu'à vérification
 des autorisations originales. Voir `avancement.md` pour les preuves et réserves.
 
+La traçabilité disponible est partielle : le résumé V8 est conservé dans
+`avancement.md`, mais pas sa sortie JSON détaillée ; le test des routes RAG est
+présent, sans compte rendu d'exécution dédié retrouvé. Aucun test ni benchmark
+n'a été relancé pour cette clôture documentaire. Voir aussi les errata datés du
+rapport 8a.1 et de `docs/ETAPE_7_CONCEPTION.md`.
+
 Pour le RAG, l'objectif approuvé est un p95 de recherche strictement inférieur
 à deux secondes pour chacun des cinq types de patterns, indépendamment de toute
 génération par LLM. L'étape 7 définit et valide le protocole reproductible ; la

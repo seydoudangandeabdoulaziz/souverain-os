@@ -12,6 +12,8 @@ Ce fichier résume les décisions actées. Le détail argumenté de chaque déci
 | Déploiement Ollama dans Docker | Environnement cible, avec réserve mémoire et tests de fidélité | ADR-006 | Acceptée en principe — réserves ouvertes |
 | MVP RAG documentaire | Conception de l'étape 7 validée ; paquet transverse `rag/`, pipeline Python autonome, sans LLM ; `intfloat/multilingual-e5-small` approuvé, révision `614241f622f53c4eeff9890bdc4f31cfecc418b3` | Décisions verrouillées §10 ; ADR-008 associé | Socle technique de l'étape 8 validé le 8 novembre 2026 sur données synthétiques ; corpus réel autorisé non validé, FATF exclu en attente des preuves |
 
+La clôture est limitée au socle technique synthétique. La sortie JSON détaillée du benchmark V8 et un compte rendu d'exécution dédié au test des routes RAG n'ont pas été retrouvés dans le dépôt ; le résumé et les limites sont consignés dans `avancement.md`. Les publications FATF restent exclues jusqu'à vérification des autorisations originales. La section 10 de `docs/00_DECISIONS_VERROUILLEES.md` demeure inchangée et prévaut sur ce résumé.
+
 ## 8. Modèle LLM local — Ministral 3 8B (remplace la mention Mistral 7B)
 
 **Ajouté le 7 octobre 2026, corrigé le 13 octobre 2026, complété le 20
