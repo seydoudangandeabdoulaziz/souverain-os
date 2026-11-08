@@ -44,11 +44,4 @@ TEXTES_FR: dict[str, str] = {
         "Les données de cette alerte ne permettent pas de produire "
         "une explication fiable. Une vérification des données est nécessaire."
     ),
-    "rag.indisponible": "La recherche documentaire n’est pas disponible.",
-    "rag.concurrence": "Une recherche documentaire est déjà en cours.",
-    "rag.aucun_resultat": "Aucun passage documentaire sourcé n’a été trouvé.",
-    "rag.reference": "Référence documentaire",
-    "rag.page": "page",
-    "rag.source": "Ouvrir la source",
-    "rag.synthetique": "Source synthétique",
 }

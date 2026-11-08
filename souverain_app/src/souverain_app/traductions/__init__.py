@@ -11,9 +11,10 @@ dans _DICTIONNAIRES, sans toucher aux routes.
 from __future__ import annotations
 
 from souverain_app.traductions.fr import TEXTES_FR
+from souverain_app.traductions.rag_fr import TEXTES_RAG_FR
 
 _DICTIONNAIRES: dict[str, dict[str, str]] = {
-    "fr": TEXTES_FR,
+    "fr": {**TEXTES_FR, **TEXTES_RAG_FR},
 }
 
 _LANGUE_PAR_DEFAUT = "fr"
