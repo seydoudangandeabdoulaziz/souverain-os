@@ -1,6 +1,7 @@
 # ADR-008 — Sécurité IA/RAG : cadre de conception de l'étape 7
 
-**Statut : Conception de l'étape 7 validée par le fondateur le 4 novembre 2026 pour le périmètre du MVP RAG ; protocole V8 approuvé comme référence expérimentale. Les propositions techniques non approuvées ci-dessous restent des propositions ; cette validation n'autorise pas l'étape 8.**
+**Statut de conception : validée par le fondateur le 4 novembre 2026 pour le périmètre du MVP RAG ; protocole V8 approuvé comme référence expérimentale.**
+**État ultérieur : le socle technique de l'étape 8 a été validé par le fondateur le 8 novembre 2026 sur données synthétiques ; voir l'addendum de clôture. Les propositions historiques ci-dessous sont conservées avec leur statut d'origine, sous réserve des décisions ultérieures explicitées dans l'addendum.**
 **Décideur : Seydou Dangande Abdoul Aziz (fondateur).**
 **Emplacement : `docs/adr/ADR-008-securite-ia-rag.md`** (les ADR du dépôt vivent dans `docs/adr/`, de ADR-000 à ADR-007).
 **Contexte : Étape 7, conception uniquement.** Complète ADR-004 (modèle), ADR-006 (déploiement) et ADR-007 (explication des alertes). S'appuie sur ADR-005 (provisionnement) et ADR-003 (intégrité).
@@ -16,7 +17,9 @@ La 6b a laissé quatre réserves distinctes : limite de fréquence et de concurr
 
 Cet ADR fixe le cadre de sécurité avant toute implémentation.
 
-## Statut des décisions
+## Statut des décisions dans la version initiale (4 novembre 2026)
+
+Cette section et le tableau de décisions ci-dessous conservent l'état de proposition consigné à cette date. Les décisions ultérieures du fondateur sont consignées dans l'addendum de clôture en fin de document.
 
 - **D1 et D3 :** seul le périmètre borné par la section 10 des décisions verrouillées est approuvé : MVP sans LLM et corpus public commun sans collections privées par tenant. Les propositions historiques détaillées ci-dessous sur le classement par modèle et les collections privées restent hors MVP et non autorisées.
 - **D6 :** orientation POST + CSRF validée pour les actions concernées ; ses détails d'application restent soumis aux critères de conception et d'implémentation applicables.
@@ -105,3 +108,15 @@ A1 (traité dans le périmètre de la section 10 approuvée ; aucune modificatio
 - ADR-000 à ADR-007.
 - `docs/ETAPE_6B_BILAN.md` §6 ; `docs/etape_6b_donnees/gel_v2.json`.
 - `docs/00_DECISIONS_VERROUILLEES.md`, sections 1 à 10 ; les sections 8 et 9 restent historiques et inchangées.
+
+## Addendum — décisions et clôture technique (8 novembre 2026)
+
+Le fondateur a approuvé D5 et D7 dans le principe suivant, désormais appliqué au MVP :
+
+- **D5 :** ingestion locale exclusivement par CLI ; manifeste de provenance obligatoire ; vérification SHA-256 ; vérification des droits avant ingestion ; aucun journal durable supplémentaire.
+- **D7 :** contrôle de concurrence en mémoire, un seul traitement simultané et refus rapide ; déploiement MVP mono-processus.
+- **D10 :** aucune modification de la visibilité ou de la licence du dépôt pour le moment. L'audit de la contradiction entre document fondateur, `LICENSE` et `SECURITY.md` reste séparé. Les droits du code et ceux des documents du corpus sont distincts.
+
+Le modèle approuvé est `intfloat/multilingual-e5-small`, révision `614241f622f53c4eeff9890bdc4f31cfecc418b3`. Les résultats déjà obtenus (tests ciblés RAG/Chroma, Ruff, mypy sur 12 modules, démarrage authentifié Chroma et V8 synthétique) soutiennent la validation du socle technique sur données synthétiques. Le p95 V8 synthétique observé était de 20 à 22 ms selon le type, avec environ 793 Mio de RSS côté client. Aucun contrôle n'a été relancé pour cet addendum.
+
+La validation ne couvre pas la qualité de recherche sur corpus réel. Chaque preuve de droits doit être examinée et approuvée humainement ; SHA-256 en garantit l'intégrité après référence, pas l'authenticité juridique. Les publications FATF restent exclues jusqu'à vérification de leurs autorisations originales. En cas d'interruption, une collection Chroma partielle est refusée et sa récupération reste manuelle ; elle n'est jamais supprimée automatiquement.

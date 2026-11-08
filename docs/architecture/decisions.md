@@ -10,7 +10,7 @@ Ce fichier résume les décisions actées. Le détail argumenté de chaque déci
 | Multilinguisme produit | FR + langues locales par pays (haoussa/zarma pour le Niger) — objectif acté, implémentation différée à la Brique 7 et à une future brique notifications | ADR-001 | Acceptée |
 | Moteur de traduction | NLLB-200-distilled-600M (Transformers/CTranslate2), distinct d'Ollama ; M2M100 en repli identifié pour le zarma si besoin | ADR-002 | Acceptée |
 | Déploiement Ollama dans Docker | Environnement cible, avec réserve mémoire et tests de fidélité | ADR-006 | Acceptée en principe — réserves ouvertes |
-| MVP RAG documentaire | Conception de l'étape 7 validée dans le périmètre de la section 10 ; paquet transverse `rag/`, pipeline Python autonome privilégié, sans LLM et sans dépendance obligatoire à LlamaIndex | Décisions verrouillées §10 ; ADR-008 associé | Pilote expérimental 8a.1 exécuté ; sélection d'embedding en attente du fondateur ; moteur RAG non implémenté, autorisation distincte requise |
+| MVP RAG documentaire | Conception de l'étape 7 validée ; paquet transverse `rag/`, pipeline Python autonome, sans LLM ; `intfloat/multilingual-e5-small` approuvé, révision `614241f622f53c4eeff9890bdc4f31cfecc418b3` | Décisions verrouillées §10 ; ADR-008 associé | Socle technique de l'étape 8 validé le 8 novembre 2026 sur données synthétiques ; corpus réel autorisé non validé, FATF exclu en attente des preuves |
 
 ## 8. Modèle LLM local — Ministral 3 8B (remplace la mention Mistral 7B)
 

@@ -39,6 +39,7 @@ members = [
     "briques/brique_06_neo4j",
     "briques/brique_07_dashboard",
     "briques/brique_08_audit_human_loop",
+    "rag",
     "souverain_app",
 ]
 
@@ -57,7 +58,7 @@ warn_unused_ignores = true
 warn_return_any = true
 
 [tool.pytest.ini_options]
-testpaths = ["briques", "tests"]
+testpaths = ["briques", "tests", "rag/tests"]
 python_files = ["test_*.py"]
 asyncio_mode = "auto"
 addopts = "--import-mode=importlib"

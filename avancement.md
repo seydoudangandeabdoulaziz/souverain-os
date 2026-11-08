@@ -46,13 +46,19 @@ VALIDÉE
 | 5 | Test de charge du pipeline actuel | **VALIDÉE** |
 | 6 | Ollama/Mistral (→ Ministral 3 8B, voir détail) | 6a VALIDÉE (20 octobre 2026), 6b **VALIDÉE** le 30 octobre 2026 par le fondateur — lot v2 sans échec bloquant, suite complète 486/486, vérifications avec de vraies sessions (`analyst`, `auditor`) ; réserves ouvertes, voir le détail |
 | 7 | Sécurité IA/RAG (conception du MVP RAG) | **VALIDÉE par le fondateur** — conception et périmètre fonctionnel/sécuritaire uniquement ; réserves conservées |
-| 8 | RAG | **EN ANALYSE** — lot 8a.1, pilote comparatif d'embeddings exécuté ; sélection du modèle en attente du fondateur ; implémentation du moteur RAG non commencée et non autorisée |
+| 8 | RAG | **VALIDÉE — socle technique sur données synthétiques** (8 novembre 2026, fondateur) ; corpus réel autorisé non validé ni ingéré |
 | 9 | Redis/Celery (conditionnel à l'étape 5) | NON COMMENCÉE |
 | 10 | SOUVERAIN-ID complet | NON COMMENCÉE |
 | 11 | PQC (ML-KEM + ML-DSA) | NON COMMENCÉE |
 | 12 | Résilience inter-États (conception) | NON COMMENCÉE |
 
-**État du lot 8a.1 (7 novembre 2026)** : le pilote comparatif `multilingual-e5-small` / `multilingual-e5-base` a été exécuté sur `fatf-word-v1.1` et les cinq requêtes canoniques. Les annotations et métriques restent provisoires et assistées par IA ; elles ne constituent pas une validation humaine experte. Le fondateur reste seul décisionnaire du choix de modèle. Aucun moteur RAG n'a été implémenté ; toute implémentation ultérieure requiert une autorisation distincte.
+**État historique du lot 8a.1 (7 novembre 2026)** : le pilote comparatif `multilingual-e5-small` / `multilingual-e5-base` a été exécuté sur `fatf-word-v1.1` et les cinq requêtes canoniques. Les annotations et métriques restent provisoires et assistées par IA ; elles ne constituent pas une validation humaine indépendante. Le pilote ne validait pas le moteur RAG. Le choix E5-small et l'autorisation distincte d'implémenter ont été donnés ensuite par le fondateur. Les trois publications FATF restent exclues de toute ingestion tant que les autorisations originales ne sont pas retrouvées et vérifiées.
+
+**Clôture de l'étape 8 — 8 novembre 2026.** Le fondateur valide le socle technique RAG sur données synthétiques. Résultats réutilisés, sans relance lors de cette clôture : tests ciblés RAG et Chroma réussis (dont 10 tests du magasin Chroma et 9 tests du manifeste après la correction d'intégrité), Ruff propre, mypy sans erreur sur 12 modules, démarrage réel du serveur Chroma authentifié vérifié. Le benchmark V8 synthétique déjà réalisé a observé un p95 de 20 à 22 ms selon le type de requête et environ 793 Mio de RSS côté client. Ces mesures attestent le fonctionnement technique dans le protocole et l'environnement testés ; elles ne valident pas la pertinence de recherche sur un corpus réel.
+
+Le SHA-256 est calculé sur les octets conservés en mémoire et l'extraction utilise ces mêmes octets ; le test de modification de la source après validation est passé. Le déploiement MVP reste mono-processus, avec refus rapide en cas de traitement concurrent. Une collection Chroma partielle est refusée et nécessite une récupération manuelle, sans suppression automatique. Le statut de droits et son justificatif doivent être vérifiés humainement avant approbation ; l'empreinte du justificatif ne démontre pas à elle seule son authenticité juridique.
+
+**Réserves avant documents réels :** aucune publication FATF en attente n'est autorisée à l'ingestion ; aucun corpus documentaire réel autorisé n'a servi à valider la qualité de recherche. Il faudra retrouver et examiner les autorisations par publication, faire approuver chaque source dans le manifeste et appliquer la procédure opérateur de récupération de collection partielle avant une ingestion réelle. La validation de l'étape 8 ne vaut donc pas autorisation d'ingérer ces sources ni validation d'un corpus de production.
 
 ## Détail — Brique 0 (Fondations)
 

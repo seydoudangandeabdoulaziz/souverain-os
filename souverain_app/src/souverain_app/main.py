@@ -49,6 +49,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_
 from starlette.responses import JSONResponse
 
 from souverain_app.explication_routes import construire_routes_explication
+from souverain_app.rag_routes import construire_routes_rag
 
 _logger = logging.getLogger("souverain_app.requetes")
 _logger.setLevel(logging.INFO)
@@ -74,6 +75,7 @@ def creer_application_complete() -> FastAPI:
     app.include_router(construire_routes_audit())
     app.include_router(construire_routes_gouvernance())
     app.include_router(construire_routes_explication())
+    app.include_router(construire_routes_rag())
 
     @app.middleware("http")
     async def journaliser_requete(
@@ -89,13 +91,20 @@ def creer_application_complete() -> FastAPI:
         reponse = await call_next(request)
         duree_s = time.perf_counter() - debut
         duree_ms = round(duree_s * 1000, 2)
+        route = request.scope.get("route")
+        route_path = getattr(route, "path", "")
+        # Les recherches documentaires ne laissent aucune trace de leur type
+        # fermé dans les journaux durables : seule la route générique est gardée.
+        chemin_journal = (
+            route_path if route_path.startswith("/references/") else request.url.path
+        )
 
         _logger.info(
             json.dumps(
                 {
                     "request_id": request_id,
                     "methode": request.method,
-                    "chemin": request.url.path,
+                    "chemin": chemin_journal,
                     "statut": reponse.status_code,
                     "duree_ms": duree_ms,
                 },
@@ -110,7 +119,6 @@ def creer_application_complete() -> FastAPI:
         # risque de cardinalité non bornée. "non_apparie" pour tout
         # chemin qui n'a matché aucune route (404, sondes, etc.),
         # regroupé sous une seule valeur bornée.
-        route = request.scope.get("route")
         chemin_label = getattr(route, "path", "non_apparie")
         _requetes_total.labels(
             methode=request.method, chemin=chemin_label, statut=str(reponse.status_code)

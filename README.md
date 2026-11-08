@@ -9,6 +9,7 @@ Porteur du projet : **Seydou Dangande Abdoul Aziz** — EMIG, Niamey, Niger.
 > **Statut actuel :** les briques 0 à 8 sont indiquées comme validées dans le suivi du projet.
 > **Étape 6A :** clôturée le 20 octobre 2026.
 > **Étape 6B :** validée le 30 octobre 2026 (voir `avancement.md`, ADR-007 et `docs/ETAPE_6B_BILAN.md`).
+> **Étape 8 :** socle technique RAG validé le 8 novembre 2026 sur données synthétiques. Aucun corpus réel autorisé n'a encore été validé ; les publications FATF en attente sont exclues.
 >
 > Consulter [`avancement.md`](./avancement.md) pour l'état détaillé,
 > les validations et les réserves éventuelles.
@@ -47,6 +48,12 @@ Les briques 0 à 8 sont indiquées comme validées dans le suivi du projet.
 Les composants transverses — RAG, Ollama/Mistral, PQC,
 Redis/Celery, Prometheus/Grafana et SOUVERAIN-ID complet —
 doivent être suivis selon leur état réel dans `avancement.md`.
+
+Le socle RAG MVP est local, sans LLM, avec embeddings E5-small et recherche
+sur cinq types fermés. Sa validation synthétique ne vaut pas validation des
+droits ni de la pertinence sur un corpus documentaire réel. Toute source réelle
+nécessite une provenance et des droits vérifiés humainement avant ingestion ;
+une collection Chroma interrompue se récupère manuellement.
 
 L'étape 6 est divisée en deux phases :
 - **6A — Faisabilité de l'inférence locale :** clôturée le 20 octobre 2026.

@@ -1,7 +1,8 @@
 # SOUVERAIN-OS — Étape 7 : Sécurité IA/RAG (conception) — révision 6
 
-**Statut : CONCEPTION VALIDÉE par le fondateur le 4 novembre 2026**, exclusivement pour la conception et le périmètre fonctionnel et sécuritaire du MVP RAG. Les réserves restent applicables ; cette validation n'autorise pas l'étape 8.
-**Nature : conception documentaire uniquement. Aucun code applicatif, test, migration, dépendance ou configuration RAG n'est implémenté.**
+**Statut de conception : VALIDÉE par le fondateur le 4 novembre 2026**, exclusivement pour la conception et le périmètre fonctionnel et sécuritaire du MVP RAG.
+**État ultérieur : le socle technique de l'étape 8 a été validé par le fondateur le 8 novembre 2026 sur données synthétiques ; voir l'addendum de clôture ci-dessous.**
+**Nature de la révision 6 (4 novembre 2026) : conception documentaire uniquement.**
 **Révision 6 du 4 novembre 2026**, après enregistrement de la validation du fondateur et approbation du protocole V8 comme référence expérimentale.
 **ADR associé : `docs/adr/ADR-008-securite-ia-rag.md` (les propositions techniques non approuvées restent distinctes de la validation de la conception).**
 
@@ -9,7 +10,7 @@
 
 La validation finale de l'étape 7 appartient exclusivement au fondateur. Elle a été prononcée le 4 novembre 2026 pour la conception du MVP RAG et son périmètre fonctionnel et sécuritaire approuvé ; elle ne vaut pas autorisation d'implémenter l'étape 8.
 
-**Statuts des décisions :**
+**Statuts des décisions dans la révision du 4 novembre 2026 (historique) :**
 - **D1 : MVP sans LLM** et **D3 : corpus public commun, sans collection privée par tenant dans le MVP** sont bornés par la section 10 des décisions verrouillées. **D6 : POST + CSRF** reste l'orientation validée pour les actions concernées.
 - **D2 :** le principe de requête construite par le serveur depuis la liste fermée des types de patterns est approuvé par la section 10 ; le détail de la table de correspondance canonique reste technique et à préciser.
 - **D4, D5, D7 et D10 : propositions soumises à arbitrage.**
@@ -534,4 +535,14 @@ Les documents historiques de la 6a/6b et les sections 8 et 9 des décisions verr
 | 4 novembre 2026 | **Révision 5** : le critère 9 et A9 sont précisés sur l'exclusion des échauffements, le calcul du p95 par type et la documentation des résultats ; aucun test ni mesure réelle n'est effectué. |
 | 4 novembre 2026 | **Révision 6** : validation de la conception enregistrée selon la décision du fondateur ; protocole V8 approuvé comme référence expérimentale, mesure réelle reportée au lot 8a ; étape 8 non autorisée. |
 
-**L'étape 8 n'est pas autorisée par la validation de cette conception et exige une autorisation distincte du fondateur.**
+La dernière phrase ci-dessus décrit l'état au 4 novembre 2026. L'autorisation distincte a depuis été donnée ; le statut de clôture figure dans l'addendum daté ci-dessous.
+
+## Addendum — clôture documentaire de l'étape 8 (8 novembre 2026)
+
+Le fondateur a validé le socle technique RAG MVP sur données synthétiques. Le modèle approuvé est `intfloat/multilingual-e5-small`, révision `614241f622f53c4eeff9890bdc4f31cfecc418b3`. Le pipeline local respecte le périmètre approuvé : cinq types de requêtes fermés, embeddings locaux, recherche vectorielle sans LLM, ingestion par CLI avec manifeste, empreintes SHA-256 et contrôle des droits avant extraction. Les octets hachés sont conservés pour l'extraction ; une modification ultérieure du fichier source ne change pas le contenu extrait pour l'ingestion en cours.
+
+Les résultats déjà acquis sont réutilisés : tests ciblés RAG/Chroma passés, Ruff propre, mypy propre sur 12 modules, démarrage vérifié du Chroma authentifié, et benchmark V8 synthétique avec p95 observé de 20 à 22 ms selon le type et environ 793 Mio de RSS client. Aucun de ces résultats ne démontre la pertinence de recherche sur des documents réels autorisés.
+
+Décisions techniques approuvées appliquées : D5 ingestion locale exclusivement par CLI, manifeste de provenance obligatoire, SHA-256, contrôle humain des droits avant ingestion et aucun journal durable supplémentaire ; D7 concurrence en mémoire, un seul traitement simultané avec refus rapide et déploiement mono-processus. D10 ne change ni visibilité ni licence du dépôt ; l'audit de leur contradiction est distinct. Ces précisions ne modifient pas les décisions verrouillées.
+
+Limites MVP : une collection Chroma partielle est refusée et nécessite une récupération manuelle, sans suppression automatique ; l'authenticité et la portée juridique des preuves de droits reposent sur la validation humaine et ne sont pas établies par leur empreinte cryptographique ; aucune validation du moteur sur corpus réel autorisé n'a été faite. Les trois publications FATF demeurent exclues jusqu'à récupération et vérification de leurs autorisations originales. La validation de l'étape 8 ne constitue pas une autorisation d'ingestion de ces documents.

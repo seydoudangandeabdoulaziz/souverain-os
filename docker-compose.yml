@@ -74,6 +74,32 @@ services:
     networks:
       - souverain-net
 
+  # Étape 8 : serveur vectoriel persistant, authentifié et non exposé au LAN.
+  # L'application reste un processus hôte unique ; l'ingestion se fait par CLI.
+  chroma:
+    image: chromadb/chroma:1.5.9
+    profiles: ["rag"]
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "FALSE"
+      ALLOW_RESET: "FALSE"
+      CHROMA_SERVER_AUTHN_PROVIDER: chromadb.auth.token_authn.TokenAuthenticationServerProvider
+      CHROMA_SERVER_AUTHN_CREDENTIALS: ${SOUVERAIN_RAG_CHROMA_TOKEN:?Définir un jeton local SOUVERAIN_RAG_CHROMA_TOKEN}
+    command: ["run", "--path", "/chroma/chroma", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "127.0.0.1:${SOUVERAIN_RAG_CHROMA_PORT:-8000}:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    mem_limit: 2g
+    cpus: 2.0
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v2/heartbeat', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks:
+      - souverain-net
+
 # ------------------------------------------------------------
 # Emplacements réservés pour les futurs services, par profile :
 #
@@ -180,6 +206,7 @@ volumes:
   prometheus_data:
   grafana_data:
   ollama_data:
+  chroma_data:
 
 networks:
   souverain-net:
