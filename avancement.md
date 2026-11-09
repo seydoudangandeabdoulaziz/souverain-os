@@ -62,6 +62,8 @@ Le SHA-256 est calculé sur les octets conservés en mémoire et l'extraction ut
 
 **Réserves avant documents réels :** aucune publication FATF en attente n'est autorisée à l'ingestion ; aucun corpus documentaire réel autorisé n'a servi à valider la qualité de recherche. Il faudra retrouver et examiner les autorisations par publication, faire approuver chaque source dans le manifeste et appliquer la procédure opérateur de récupération de collection partielle avant une ingestion réelle. La validation de l'étape 8 ne vaut donc pas autorisation d'ingérer ces sources ni validation d'un corpus de production.
 
+**Réserve de clôture de l'étape 8 (8 novembre 2026, après relance de la suite complète) :** la clôture reposait sur des tests ciblés ; la suite complète n'avait pas été relancée. Sa relance a révélé deux défauts, corrigés depuis. (1) `SOUVERAIN_RAG_CHROMA_TOKEN` est obligatoire dans `docker-compose.yml` mais était absente de `.env.example` : tout `docker compose` échouait, même sans le profil `rag`. Elle est désormais documentée. (2) Sept clés `rag.*` avaient été ajoutées à `traductions/fr.py`, fichier couvert par le gel du lot v2 : le garde-fou a échoué. Elles sont déplacées dans `traductions/rag_fr.py` (commit `20967d6`) et `fr.py` retrouve l'empreinte du gel. Suite complète après correction : 529 tests réussis. Conséquence connue : les textes `rag.*` ne sont plus soumis au contrôle des termes interdits du lot v2.
+
 ## Détail — Brique 0 (Fondations)
 
 **Statut : VALIDÉE**
@@ -452,7 +454,7 @@ Après ces cinq corrections :
 - Non-régression confirmée sur les Briques 0 à 7 (aucun test cassé par l'ajout de la Brique 8).
 
 **Vérification manuelle dans un vrai navigateur, effectuée par le fondateur :**
-- Fermeture réelle de l'alerte `demo_dashboard_test_01` (motif `faux_positif`, commentaire libre) — historique affiché correctement avec l'email résolu (`azo@gmail.com`, jointure `shared.users`), horodatage et message de confirmation via le mécanisme `t()` propre à la Brique 8.
+- Fermeture réelle de l'alerte `demo_dashboard_test_01` (motif `faux_positif`, commentaire libre) — historique affiché correctement avec l'email résolu (`analyste@exemple.test`, jointure `shared.users`), horodatage et message de confirmation via le mécanisme `t()` propre à la Brique 8.
 - Les 3 requêtes Neo4j du fragment graphe (Brique 6) ont correctement retourné "Aucun résultat" pour ce compte de démo, jamais synchronisé dans Neo4j — comportement déjà documenté et attendu depuis la Brique 7, confirmé non cassé par l'ajout de la Brique 8.
 - Rôle `auditor` (formulaire masqué, historique seul) : **non vérifié visuellement** dans le navigateur (aucun compte `auditor` créé sur l'environnement de démo du fondateur) — confirmé uniquement par `test_fragment_masque_le_formulaire_pour_un_auditor`, qui crée un vrai utilisateur `auditor` et vérifie l'absence du `<form>` dans une vraie réponse HTTP contre la base réelle. Le fondateur juge cette couverture automatisée suffisante, la vérification visuelle n'étant qu'un bonus de confiance et non une condition de validation.
 
@@ -501,7 +503,7 @@ Après cette correction, sur la machine réelle du fondateur (ThinkPad X1 Carbon
 
 **Vérification manuelle effectuée par le fondateur, en conditions réelles :**
 - CLI Brique 1 : création d'un tenant de test (`tenant_sn_test`), désactivation, réactivation — chaque opération confirmée tracée dans `shared.gouvernance_audit_log` avec l'`acteur_declare` exact saisi en paramètre, horodatage précis.
-- Interface web Brique 2 : bootstrap du tout premier compte `admin` (remontée manuelle en base du seul compte existant, `azo@gmail.com`, `analyst` → `admin` — cas de démarrage inévitable, aucun compte admin ne préexistait), puis entièrement via l'interface : création de deux comptes supplémentaires (`abdoul@gmail.com` en admin, `aziz@gmail.com` en auditor), désactivation/réactivation d'un compte, historique de gouvernance affiché correctement avec `acteur_user_id` réel (authentifié) — distinct du `acteur_declare` du CLI, confirmant visuellement la séparation structurelle actée à la conception.
+- Interface web Brique 2 : bootstrap du tout premier compte `admin` (remontée manuelle en base du seul compte existant, `analyste@exemple.test`, `analyst` → `admin` — cas de démarrage inévitable, aucun compte admin ne préexistait), puis entièrement via l'interface : création de deux comptes supplémentaires (`admin2@exemple.test` en admin, `auditeur@exemple.test` en auditor), désactivation/réactivation d'un compte, historique de gouvernance affiché correctement avec `acteur_user_id` réel (authentifié) — distinct du `acteur_declare` du CLI, confirmant visuellement la séparation structurelle actée à la conception.
 - **RBAC confirmé en conditions réelles, pas seulement par test automatisé** : connexion successive avec un compte `auditor` puis un compte `analyst`, tentative d'accès à `/utilisateurs` dans les deux cas — refus `403` (`"Vous n'avez pas les droits nécessaires pour cette action."`) confirmé pour les deux rôles, seul `admin` passe.
 
 **Extensions V2 (Gouvernance des tenants — Brique 1, Gouvernance des utilisateurs — Brique 2) VALIDÉES le 6 septembre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
