@@ -20,7 +20,7 @@ from brique_04_detection.modeles import DetectionEvent
 from brique_04_detection.persistence import enregistrer_detections
 from brique_05_scoring_alertes.agregation import agreger_par_compte
 from brique_05_scoring_alertes.lecture import lire_detections_fenetre
-from brique_05_scoring_alertes.persistence import enregistrer_scores
+from brique_05_scoring_alertes.persistence import ResultatPersistence, enregistrer_scores
 from brique_05_scoring_alertes.seuils import FENETRE_JOURS
 
 
@@ -35,7 +35,7 @@ def _detection_event(pattern_type: str, compte_pivot: str) -> DetectionEvent:
     )
 
 
-async def _executer_cycle(pool: asyncpg.Pool, tenant: str) -> tuple[int, object]:
+async def _executer_cycle(pool: asyncpg.Pool, tenant: str) -> tuple[int, ResultatPersistence]:
     fenetre_debut = datetime.now(UTC) - timedelta(days=FENETRE_JOURS)
     detections = await lire_detections_fenetre(pool, tenant, fenetre_debut)
     scores = agreger_par_compte(detections, fenetre_debut, datetime.now(UTC))

@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS {schema_name}.transactions (
     -- Données brutes non structurées de la source, conservées pour
     -- traçabilité/audit sans perte d'information.
     raw_payload            JSONB,
+    is_synthetic           BOOLEAN NOT NULL DEFAULT false,
 
     -- PRIMARY KEY composite (transaction_id, occurred_at) : exigence
     -- TimescaleDB pour les hypertables (la clé de partitionnement

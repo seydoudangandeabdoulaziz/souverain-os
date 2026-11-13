@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -58,7 +58,7 @@ class PostgresSettings(BaseSettings):
     port: int = Field(default=5432, description="Port PostgreSQL")
     db: str = Field(default="souverain_os", description="Nom de la base")
     user: str = Field(default="souverain_admin", description="Utilisateur PostgreSQL")
-    password: str = Field(default="", description="Mot de passe (jamais en dur, via .env)")
+    password: SecretStr = Field(description="Mot de passe admin PostgreSQL fourni explicitement")
 
     # Paramètres du pool de connexions asyncpg.
     pool_min_size: int = Field(default=2, description="Taille minimale du pool")
@@ -67,7 +67,10 @@ class PostgresSettings(BaseSettings):
     @property
     def dsn(self) -> str:
         """Construit le DSN (Data Source Name) attendu par asyncpg."""
-        return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.db}"
+        return (
+            f"postgresql://{self.user}:{self.password.get_secret_value()}@"
+            f"{self.host}:{self.port}/{self.db}"
+        )
 
 
 def get_settings() -> PostgresSettings:
@@ -77,4 +80,46 @@ def get_settings() -> PostgresSettings:
     Centraliser cet accès permet, plus tard, d'y ajouter du cache
     ou de la validation supplémentaire sans changer les appelants.
     """
-    return PostgresSettings()
+    return PostgresSettings()  # type: ignore[call-arg]  # POSTGRES_PASSWORD obligatoire
+
+
+class RuntimePostgresSettings(BaseSettings):
+    """Identifiants du compte à privilèges réduits utilisé par le web."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="APP_POSTGRES_",
+        env_file=_ENV_FILE,
+        env_file_encoding="utf-8",
+        extra="ignore",
+        hide_input_in_errors=True,
+    )
+
+    host: str = Field(default="localhost", description="Hôte PostgreSQL")
+    port: int = Field(default=5432, description="Port PostgreSQL")
+    db: str = Field(default="souverain_os", description="Nom de la base")
+    user: str = Field(default="souverain_app", description="Rôle PostgreSQL d'exécution web")
+    password: SecretStr = Field(
+        min_length=32,
+        description="Mot de passe configuré pour souverain_app",
+    )
+    pool_min_size: int = Field(default=2, description="Taille minimale du pool web")
+    pool_max_size: int = Field(default=10, description="Taille maximale du pool web")
+
+    @field_validator("user")
+    @classmethod
+    def refuser_role_admin(cls, value: str) -> str:
+        if value == "souverain_admin":
+            raise ValueError("Le rôle superutilisateur est interdit pour l'exécution applicative")
+        return value
+
+    @property
+    def dsn(self) -> str:
+        return (
+            f"postgresql://{self.user}:{self.password.get_secret_value()}@"
+            f"{self.host}:{self.port}/{self.db}"
+        )
+
+
+def get_runtime_settings() -> RuntimePostgresSettings:
+    """Charge la configuration propre au rôle PostgreSQL de l'application web."""
+    return RuntimePostgresSettings()  # type: ignore[call-arg]  # APP_POSTGRES_PASSWORD obligatoire

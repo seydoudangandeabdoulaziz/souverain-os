@@ -32,7 +32,7 @@ async def create_driver(settings: Neo4jSettings | None = None) -> AsyncDriver:
 
     driver = AsyncGraphDatabase.driver(
         resolved_settings.uri,
-        auth=(resolved_settings.user, resolved_settings.password),
+        auth=(resolved_settings.user, resolved_settings.password.get_secret_value()),
     )
 
     try:

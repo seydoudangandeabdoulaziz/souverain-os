@@ -77,6 +77,30 @@ docker compose exec -T postgres psql -U souverain_admin -d souverain_os \
   < briques/brique_01_postgresql/migrations/0001_init_shared_schema.sql
 ```
 
+Cette commande applique uniquement le schéma partagé initial. Pour le
+correctif P0 d'identités PostgreSQL par tenant, l'ordre validé sur une base
+scratch est :
+
+1. B1 `0001` à `0005`, puis B2 `0001` à `0003` ;
+2. provisionner les schémas des tenants existants, puis appliquer les
+   migrations B3, B4, B5 et B8 (`0001`, puis B8 `0002`) ;
+3. appliquer B1 `0006`, B1 `0007`, puis B1 `0008` en dernier ;
+4. avant le démarrage applicatif, provisionner les rôles login par tenant :
+
+   ```bash
+   uv run python briques/brique_01_postgresql/scripts/provision_tenant_roles.py \
+     --expected-database souverain_os
+   ```
+
+Le script vérifie le nom réel de la base, génère ou réutilise les secrets,
+les écrit dans le `.env` local en mode `0600` et n'affiche aucune valeur
+secrète. `0008` échoue si un rôle tenant déterministe possède déjà des
+objets ; les appartenances et ACL résiduelles sont nettoyées avant
+d'accorder les seuls droits attendus. Les tests et migrations de ce correctif
+ont été exécutés sur des bases scratch uniquement. **Ne pas appliquer à la
+base principale sans autorisation explicite du fondateur**, sauvegarde
+vérifiée et contrôle préalable des rôles/ACL existants.
+
 ## Vérifier que tout fonctionne
 
 ```bash

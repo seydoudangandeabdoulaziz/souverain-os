@@ -40,7 +40,7 @@ import time
 import uuid
 from collections.abc import Awaitable, Callable
 
-from brique_01_postgresql.healthcheck_db import run_db_healthcheck
+from brique_01_postgresql.healthcheck_db import run_runtime_db_healthcheck
 from brique_02_auth_rbac.gouvernance.routes import construire_routes_gouvernance
 from brique_07_dashboard.app import creer_application
 from brique_08_audit_human_loop.routes import construire_routes_audit
@@ -136,7 +136,7 @@ def creer_application_complete() -> FastAPI:
         volontaire (ok/label), jamais le detail complet du rapport
         (host/port/db, messages d'erreur bruts) — décision actée à la
         conception, pas un oubli de sécurité."""
-        rapport = await run_db_healthcheck()
+        rapport = await run_runtime_db_healthcheck()
         corps = {
             "ok": rapport.all_ok,
             "verifications": [

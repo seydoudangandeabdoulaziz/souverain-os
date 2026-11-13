@@ -40,7 +40,11 @@ async def test_login_avec_mauvais_mot_de_passe_retourne_401(
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         reponse = await ac.post(
             "/login",
-            data={"email": "dashboard-test@example.com", "mot_de_passe": "mauvais-mot-de-passe"},
+            data={
+                "tenant_code": "ZZ",
+                "email": "dashboard-test@example.com",
+                "mot_de_passe": "mauvais-mot-de-passe",
+            },
         )
 
     assert reponse.status_code == 401
@@ -55,7 +59,12 @@ async def test_login_avec_email_inconnu_retourne_401(pool: asyncpg.Pool) -> None
     app = creer_application()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         reponse = await ac.post(
-            "/login", data={"email": "personne@example.com", "mot_de_passe": "peu-importe"}
+            "/login",
+            data={
+                "tenant_code": "ZZ",
+                "email": "personne@example.com",
+                "mot_de_passe": "peu-importe",
+            },
         )
 
     assert reponse.status_code == 401

@@ -52,6 +52,33 @@ async def tenant_provisionne(pool: asyncpg.Pool) -> AsyncIterator[str]:
             f"ALTER TABLE {TENANT_TEST}.transactions "
             "ADD COLUMN IF NOT EXISTS is_synthetic BOOLEAN NOT NULL DEFAULT false;"
         )
+        # Le DDL est préparé par la fixture admin comme la migration B5 en
+        # environnement réel. Le rôle métier tenant ne crée ni table ni index.
+        await connexion.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {TENANT_TEST}.alertes (
+                alerte_id UUID PRIMARY KEY,
+                tenant_id UUID NOT NULL,
+                country_code TEXT NOT NULL,
+                data_classification TEXT NOT NULL,
+                compte_pivot TEXT NOT NULL,
+                score INTEGER NOT NULL,
+                statut TEXT NOT NULL DEFAULT 'ouverte'
+                    CHECK (statut IN ('ouverte', 'fermee')),
+                pattern_types_impliques TEXT[] NOT NULL,
+                detection_ids UUID[] NOT NULL,
+                fenetre_debut TIMESTAMPTZ NOT NULL,
+                fenetre_fin TIMESTAMPTZ NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                details JSONB
+            )
+            """
+        )
+        await connexion.execute(
+            f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{TENANT_TEST}_alertes_ouverte_compte "
+            f"ON {TENANT_TEST}.alertes (compte_pivot) WHERE statut = 'ouverte'"
+        )
 
     try:
         yield TENANT_TEST

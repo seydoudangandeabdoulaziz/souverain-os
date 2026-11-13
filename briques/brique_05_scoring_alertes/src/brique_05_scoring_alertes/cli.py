@@ -13,7 +13,7 @@ import argparse
 import asyncio
 from datetime import UTC, datetime, timedelta
 
-from brique_01_postgresql.connection import close_pool, create_pool
+from brique_01_postgresql.connection import close_tenant_pools, create_tenant_pool_for_schema
 
 from brique_05_scoring_alertes.agregation import agreger_par_compte
 from brique_05_scoring_alertes.lecture import lire_detections_fenetre
@@ -25,7 +25,7 @@ async def executer_cycle_scoring(nom_schema_tenant: str) -> None:
     maintenant = datetime.now(UTC)
     fenetre_debut = maintenant - timedelta(days=FENETRE_JOURS)
 
-    pool = await create_pool()
+    pool = await create_tenant_pool_for_schema(nom_schema_tenant)
     try:
         detections = await lire_detections_fenetre(pool, nom_schema_tenant, fenetre_debut)
 
@@ -57,7 +57,7 @@ async def executer_cycle_scoring(nom_schema_tenant: str) -> None:
                 f"patterns={score.pattern_types_impliques}"
             )
     finally:
-        await close_pool()
+        await close_tenant_pools()
 
 
 def main() -> None:

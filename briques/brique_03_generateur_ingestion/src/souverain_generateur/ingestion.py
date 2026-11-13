@@ -49,11 +49,6 @@ _REQUETE_INSERT = """
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 """
 
-_REQUETE_ASSURER_COLONNE_IS_SYNTHETIC = """
-    ALTER TABLE {schema}.transactions
-    ADD COLUMN IF NOT EXISTS is_synthetic BOOLEAN NOT NULL DEFAULT false;
-"""
-
 _REQUETE_METADONNEES_TENANT = """
     SELECT tenant_id, country_code, data_classification
     FROM shared.tenants_registry
@@ -109,23 +104,14 @@ async def inserer_transactions(
     Récupère automatiquement tenant_id/country_code/data_classification
     depuis shared.tenants_registry (une seule fois, avant la boucle).
 
-    S'assure aussi que la colonne is_synthetic existe sur ce tenant avant
-    d'insérer (ADD COLUMN IF NOT EXISTS, idempotent) — indépendant de
-    l'ordre d'exécution de migrations/0001_add_is_synthetic.sql, qui ne
-    couvre que les tenants déjà enregistrés au moment où elle tourne.
-    Un tenant provisionné après coup (ex. en test) est donc toujours
-    correctement supporté, sans dépendre de rejouer la migration.
+    La colonne is_synthetic appartient au template des nouveaux tenants;
+    les schémas historiques la reçoivent par la migration B3 0001.
 
     Retourne le nombre total de transactions insérées.
     """
     validate_schema_name(nom_schema_tenant)
     metadonnees = await recuperer_metadonnees_tenant(pool, nom_schema_tenant)
     requete = _REQUETE_INSERT.format(schema=nom_schema_tenant)
-
-    async with pool.acquire() as connexion:
-        await connexion.execute(
-            _REQUETE_ASSURER_COLONNE_IS_SYNTHETIC.format(schema=nom_schema_tenant)
-        )
 
     total_insere = 0
     async with pool.acquire() as connexion:

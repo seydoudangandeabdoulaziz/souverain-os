@@ -8,7 +8,7 @@ elle-même n'est jamais dupliquée, seule la source du jeton change
 
 from __future__ import annotations
 
-from brique_01_postgresql.connection import create_pool
+from brique_01_postgresql.connection import create_runtime_pool, create_tenant_pool
 from brique_02_auth_rbac.config import get_jwt_settings
 from brique_02_auth_rbac.jwt_tokens import create_access_token
 from brique_02_auth_rbac.password_hashing import verify_password
@@ -29,9 +29,24 @@ def construire_routes_auth(templates: Jinja2Templates) -> APIRouter:
 
     @router.post("/login")
     async def soumettre_login(
-        request: Request, email: str = Form(...), mot_de_passe: str = Form(...)
+        request: Request,
+        tenant_code: str = Form(...),
+        email: str = Form(...),
+        mot_de_passe: str = Form(...),
     ) -> object:
-        pool = await create_pool()
+        control_pool = await create_runtime_pool()
+        async with control_pool.acquire() as connexion:
+            tenant_id = await connexion.fetchval(
+                "SELECT tenant_id FROM shared.tenants_registry "
+                "WHERE tenant_code = $1 AND is_active = true",
+                tenant_code.strip().upper(),
+            )
+        if tenant_id is None:
+            return templates.TemplateResponse(
+                request, "login.html", {"erreur": "login.erreur"}, status_code=401
+            )
+
+        pool = await create_tenant_pool(tenant_id)
         async with pool.acquire() as connexion:
             utilisateur = await get_user_by_email(connexion, email)
 

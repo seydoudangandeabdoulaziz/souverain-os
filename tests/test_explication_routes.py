@@ -15,7 +15,7 @@ from souverain_app import explication_routes as routes
 
 
 @pytest.fixture
-def contexte():
+def contexte(monkeypatch):
     app = FastAPI()
     app.include_router(routes.construire_routes_explication())
 
@@ -32,13 +32,17 @@ def contexte():
         souverain_id=uuid4(),
     )
 
-    app.dependency_overrides[routes.tenant_valide] = lambda: tenant
-    app.dependency_overrides[routes.get_current_user_from_cookie] = (
-        lambda: utilisateur
-    )
+    async def tenant_test() -> MetadonneesTenant:
+        return tenant
 
-    routes.create_pool = AsyncMock(return_value=object())
-    routes.lecture.lire_alerte = AsyncMock(return_value=None)
+    async def utilisateur_test() -> AuthenticatedUser:
+        return utilisateur
+
+    app.dependency_overrides[routes.tenant_valide] = tenant_test
+    app.dependency_overrides[routes.get_current_user_from_cookie] = utilisateur_test
+
+    monkeypatch.setattr(routes, "create_tenant_pool", AsyncMock(return_value=object()))
+    monkeypatch.setattr(routes.lecture, "lire_alerte", AsyncMock(return_value=None))
 
     return app, tenant
 
@@ -56,6 +60,7 @@ async def test_alerte_absente_retourne_404(contexte):
     assert response.status_code == 404
     routes.lecture.lire_alerte.assert_awaited_once()
     assert routes.lecture.lire_alerte.await_args.args[1] == tenant.schema_name
+    routes.create_tenant_pool.assert_awaited_once_with(tenant.tenant_id)
 
 
 @pytest.mark.asyncio
@@ -92,7 +97,7 @@ async def test_alerte_valide_affiche_explication_echappee(
     assert "<script>" not in response.text
     assert "repli déterministe" in response.text
     routes.lecture.lire_alerte.assert_awaited_once_with(
-        routes.create_pool.return_value,
+        routes.create_tenant_pool.return_value,
         tenant.schema_name,
         alerte_id,
     )
@@ -106,7 +111,7 @@ async def test_route_exige_session_sans_acces_a_postgresql(monkeypatch):
     creer_pool = AsyncMock()
     lire_alerte = AsyncMock()
 
-    monkeypatch.setattr(routes, "create_pool", creer_pool)
+    monkeypatch.setattr(routes, "create_tenant_pool", creer_pool)
     monkeypatch.setattr(routes.lecture, "lire_alerte", lire_alerte)
 
     app = creer_application_complete()

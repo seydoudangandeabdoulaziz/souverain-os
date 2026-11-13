@@ -11,8 +11,11 @@
         {% if erreur %}
         <p class="erreur">{{ t(erreur) }}</p>
         {% endif %}
+        <label>{{ t('login.tenant_code') }}
+            <input type="text" name="tenant_code" required autofocus>
+        </label>
         <label>{{ t('login.email') }}
-            <input type="email" name="email" required autofocus>
+            <input type="email" name="email" required>
         </label>
         <label>{{ t('login.mot_de_passe') }}
             <input type="password" name="mot_de_passe" required>

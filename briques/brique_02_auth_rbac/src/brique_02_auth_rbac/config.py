@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -38,11 +38,11 @@ class JwtSettings(BaseSettings):
         env_file=_ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,
     )
 
-    secret_key: str = Field(
-        default="insecure-dev-secret-change-me-before-any-real-use",
-        description="Secret de signature HMAC — DOIT être changé hors développement local",
+    secret_key: SecretStr = Field(
+        description="Secret de signature HMAC fourni par JWT_SECRET_KEY",
     )
     algorithm: str = Field(default="HS256", description="Algorithme de signature JWT")
     expiration_hours: int = Field(
@@ -50,7 +50,22 @@ class JwtSettings(BaseSettings):
         description="Durée de validité d'un jeton, en heures (MVP : pas de refresh token)",
     )
 
+    @field_validator("secret_key")
+    @classmethod
+    def valider_secret_key(cls, secret: SecretStr) -> SecretStr:
+        valeur = secret.get_secret_value()
+        valeurs_interdites = {
+            "insecure-dev-secret-change-me-before-any-real-use",
+            "change_me_dev_secret_at_least_32_characters_long",
+            "change_me",
+        }
+        if not valeur.strip() or valeur in valeurs_interdites or len(valeur) < 32:
+            raise ValueError(
+                "JWT_SECRET_KEY absent, vide, trop court ou valeur de démonstration interdite"
+            )
+        return secret
+
 
 def get_jwt_settings() -> JwtSettings:
     """Point d'entrée unique pour récupérer la configuration JWT."""
-    return JwtSettings()
+    return JwtSettings()  # type: ignore[call-arg]  # chargé depuis JWT_SECRET_KEY

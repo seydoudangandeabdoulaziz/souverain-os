@@ -129,8 +129,14 @@ def app_fragment() -> FastAPI:
         role="analyst",
         souverain_id=uuid4(),
     )
-    app.dependency_overrides[routes.tenant_valide] = lambda: tenant
-    app.dependency_overrides[routes.get_current_user_from_cookie] = lambda: utilisateur
+    async def tenant_test() -> MetadonneesTenant:
+        return tenant
+
+    async def utilisateur_test() -> AuthenticatedUser:
+        return utilisateur
+
+    app.dependency_overrides[routes.tenant_valide] = tenant_test
+    app.dependency_overrides[routes.get_current_user_from_cookie] = utilisateur_test
     return app
 
 
@@ -141,7 +147,7 @@ async def test_fragment_affiche_le_bouton_sans_acces_base_ni_modele(
     async def interdit(*_args: object, **_kwargs: object) -> None:
         raise AssertionError("Le fragment ne doit accéder ni à la base ni au modèle.")
 
-    monkeypatch.setattr(routes, "create_pool", interdit)
+    monkeypatch.setattr(routes, "create_tenant_pool", interdit)
     monkeypatch.setattr(routes, "expliquer_alerte", interdit)
     alerte_id = uuid4()
 

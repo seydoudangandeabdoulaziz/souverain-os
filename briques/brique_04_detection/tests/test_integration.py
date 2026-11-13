@@ -127,6 +127,11 @@ async def test_detecte_sur_transactions_existantes_tenant_ne(pool: asyncpg.Pool)
     réelles déjà générées par la Brique 3 pour tenant_ne. Suppose que
     `uv run souverain-generer --tenant tenant_ne` a déjà été exécuté.
     """
+    tenant_present = await pool.fetchval(
+        "SELECT EXISTS(SELECT 1 FROM shared.tenants_registry WHERE schema_name = 'tenant_ne')"
+    )
+    if not tenant_present:
+        pytest.skip("Le tenant_ne de référence n'existe pas dans cette base de test isolée.")
     transactions = await lire_transactions_ordonnees(pool, "tenant_ne")
     if not transactions:
         pytest.skip("Aucune transaction pour tenant_ne — lance d'abord la Brique 3.")

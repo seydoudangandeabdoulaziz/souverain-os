@@ -19,7 +19,7 @@ def main() -> None:
     print(f"[souverain-app] Démarrage sur http://localhost:{settings.port}")
     uvicorn.run(
         "souverain_app.main:app",
-        host="0.0.0.0",  # noqa: S104 — dev local uniquement, à restreindre en déploiement réel
+        host="127.0.0.1",
         port=settings.port,
         reload=False,
     )

@@ -13,6 +13,7 @@ TEXTES_FR: dict[str, str] = {
     "nav.alertes": "Alertes",
     "nav.deconnexion": "Déconnexion",
     "login.titre": "Connexion",
+    "login.tenant_code": "Code du tenant",
     "login.email": "Email",
     "login.mot_de_passe": "Mot de passe",
     "login.bouton": "Se connecter",

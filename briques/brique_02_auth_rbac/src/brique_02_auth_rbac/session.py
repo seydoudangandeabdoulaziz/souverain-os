@@ -11,7 +11,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
-from brique_01_postgresql.connection import create_pool
+from brique_01_postgresql.connection import create_tenant_pool
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -68,7 +68,7 @@ async def get_current_user(
     except (ExpiredTokenError, InvalidTokenError) as exc:
         raise _unauthorized("Session invalide, merci de vous reconnecter.") from exc
 
-    pool = await create_pool()
+    pool = await create_tenant_pool(payload.tenant_id)
     async with pool.acquire() as connection:
         user = await get_user_by_id(connection, payload.user_id)
 

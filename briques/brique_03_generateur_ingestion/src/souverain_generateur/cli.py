@@ -1,9 +1,7 @@
 """CLI de la Brique 3 — déclenchement manuel, réservé machine de dev.
 
-CORRECTIF majeur : réutilise désormais create_pool()/close_pool()/
-get_settings() de la Brique 1 au lieu de recréer une connexion autonome
-avec une DATABASE_URL supposée. Le tenant par défaut est "tenant_ne"
-(convention réelle du dépôt), plus "tenant_001".
+La CLI résout le schéma via le rôle de contrôle puis ouvre le rôle
+PostgreSQL propre au tenant. Le tenant par défaut reste "tenant_ne".
 
 Prérequis avant le premier lancement (voir README.md) :
 1. docker compose --profile postgres up -d
@@ -11,6 +9,7 @@ Prérequis avant le premier lancement (voir README.md) :
 3. scripts/bootstrap_tenant_ne.sql joué (enregistre tenant_ne)
 4. Schéma tenant_ne physiquement provisionné (provision_tenant_schema)
 5. migrations/0001_add_is_synthetic.sql de cette brique appliquée
+6. migration 0008_tenant_scoped_roles.sql appliquée et rôle tenant provisionné
 
 Usage :
     uv run souverain-generer --tenant tenant_ne
@@ -23,7 +22,7 @@ import asyncio
 import random
 from datetime import datetime
 
-from brique_01_postgresql.connection import close_pool, create_pool
+from brique_01_postgresql.connection import close_tenant_pools, create_tenant_pool_for_schema
 
 from souverain_generateur.config import get_generateur_settings
 from souverain_generateur.generateur_legitime import (
@@ -129,11 +128,11 @@ async def executer(args: argparse.Namespace) -> None:
         f"{len(transactions_suspectes)} suspectes (seed={seed}, intensité={args.intensite})"
     )
 
-    pool = await create_pool()  # réutilise PostgresSettings de la Brique 1 (POSTGRES_*)
+    pool = await create_tenant_pool_for_schema(args.tenant)
     try:
         total_insere = await inserer_transactions(pool, args.tenant, toutes_transactions)
     finally:
-        await close_pool()
+        await close_tenant_pools()
 
     print(
         f"✅ {total_insere} transactions insérées dans le schéma {args.tenant} "

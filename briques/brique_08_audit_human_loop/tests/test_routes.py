@@ -15,6 +15,7 @@ from uuid import UUID
 
 import pytest
 import pytest_asyncio
+from brique_01_postgresql.connection import close_runtime_pool, close_tenant_pools
 from brique_02_auth_rbac.config import get_jwt_settings
 from brique_02_auth_rbac.jwt_tokens import create_access_token
 from brique_02_auth_rbac.repository import UserRecord
@@ -59,6 +60,8 @@ async def _client_pour(utilisateur: UserRecord) -> AsyncIterator[AsyncClient]:
         # l'avais pas transposé à mon propre pool. Fermer ici, à chaque
         # fin de test, garantit un pool toujours frais pour le suivant.
         await close_audit_pool()
+        await close_tenant_pools()
+        await close_runtime_pool()
 
 
 @pytest_asyncio.fixture

@@ -17,6 +17,7 @@ un scénario difficile à simuler proprement.
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import AsyncIterator
 from uuid import UUID, uuid4
 
@@ -184,7 +185,7 @@ async def test_modification_directe_est_journalisee(
         donnees_apres = json.loads(entree["donnees_apres"])
         assert donnees_avant["statut"] == "ouverte"
         assert donnees_apres["statut"] == "fermee"
-        assert entree["role_postgresql"] == "souverain_admin"
+    assert entree["role_postgresql"] == os.getenv("POSTGRES_USER", "souverain_admin")
 
 
 async def test_table_hors_perimetre_n_est_jamais_instrumentee(

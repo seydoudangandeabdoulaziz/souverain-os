@@ -1,10 +1,8 @@
 """Configuration de la Brique 3 — paramètres de GÉNÉRATION uniquement.
 
-CORRECTIF : la version précédente redéfinissait sa propre connexion DB
-(DATABASE_URL). C'était une supposition erronée — la Brique 1 fournit déjà
-PostgresSettings/get_settings() (préfixe POSTGRES_) et create_pool(), qu'il
-faut réutiliser tel quel (voir cli.py). Ce fichier ne gère donc plus QUE
-les paramètres propres à la génération de données synthétiques.
+La Brique 1 fournit le pool de contrôle et les pools PostgreSQL tenant
+scopés. Ce fichier ne gère que les paramètres propres à la génération
+de données synthétiques.
 
 Pattern identique aux Briques 1 et 2 (config.py) : classe BaseSettings
 dédiée avec son propre préfixe, _find_env_file() dupliqué localement —

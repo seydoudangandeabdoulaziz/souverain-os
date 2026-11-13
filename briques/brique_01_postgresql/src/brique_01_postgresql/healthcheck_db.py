@@ -12,9 +12,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import asyncpg
+from pydantic import ValidationError
 
 from brique_01_postgresql.config import PostgresSettings, get_settings
-from brique_01_postgresql.connection import create_pool
+from brique_01_postgresql.connection import create_pool, create_runtime_pool
 
 
 @dataclass
@@ -111,4 +112,52 @@ async def run_db_healthcheck(settings: PostgresSettings | None = None) -> DbHeal
 
     report.add(await check_timescaledb_extension(resolved_settings))
     report.add(await check_shared_schema(resolved_settings))
+    return report
+
+
+async def run_runtime_db_healthcheck() -> DbHealthcheckReport:
+    """Healthcheck du serveur web avec le rôle dédié, jamais le rôle admin."""
+    report = DbHealthcheckReport()
+    try:
+        pool = await create_runtime_pool()
+        async with pool.acquire() as connection:
+            await connection.fetchval("SELECT 1")
+        report.add(DbHealthcheckResult(ok=True, label="Connexion PostgreSQL"))
+    except (ConnectionRefusedError, ValidationError, asyncpg.PostgresError):
+        report.add(
+            DbHealthcheckResult(
+                ok=False,
+                label="Connexion PostgreSQL",
+                detail="configuration ou connexion du rôle souverain_app invalide",
+            )
+        )
+        return report
+
+    async with pool.acquire() as connection:
+        version = await connection.fetchval(
+            "SELECT extversion FROM pg_extension WHERE extname = 'timescaledb'"
+        )
+        shared_exists = await connection.fetchval(
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_schema = 'shared' AND table_name = 'tenants_registry'
+            )
+            """
+        )
+
+    report.add(
+        DbHealthcheckResult(
+            ok=version is not None,
+            label="Extension TimescaleDB",
+            detail=f"version {version}" if version is not None else "extension non installée",
+        )
+    )
+    report.add(
+        DbHealthcheckResult(
+            ok=bool(shared_exists),
+            label="Schéma partagé",
+            detail="shared.tenants_registry présent" if shared_exists else "registre absent",
+        )
+    )
     return report

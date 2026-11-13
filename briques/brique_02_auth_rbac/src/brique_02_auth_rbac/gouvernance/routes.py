@@ -14,10 +14,10 @@ from __future__ import annotations
 from pathlib import Path
 from uuid import UUID
 
+from brique_01_postgresql.connection import create_tenant_pool
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.templating import Jinja2Templates
 
-from brique_02_auth_rbac.gouvernance.connection import create_gouvernance_web_pool
 from brique_02_auth_rbac.gouvernance.csrf import (
     obtenir_ou_generer_jeton_csrf,
     poser_cookie_csrf,
@@ -53,7 +53,7 @@ def construire_routes_gouvernance() -> APIRouter:
     async def _rendre_page(
         request: Request, utilisateur: AuthenticatedUser, erreur: str | None = None
     ):
-        pool = await create_gouvernance_web_pool()
+        pool = await create_tenant_pool(utilisateur.tenant_id)
         async with pool.acquire() as connexion:
             utilisateurs = await lister_utilisateurs_du_tenant(connexion, utilisateur.tenant_id)
             historique = await lire_historique_gouvernance(connexion, utilisateur.tenant_id)
@@ -96,7 +96,7 @@ def construire_routes_gouvernance() -> APIRouter:
         ),
     ):
         verifier_csrf(request, jeton_csrf)
-        pool = await create_gouvernance_web_pool()
+        pool = await create_tenant_pool(utilisateur.tenant_id)
         try:
             async with pool.acquire() as connexion:
                 await creer_utilisateur(
@@ -129,7 +129,7 @@ def construire_routes_gouvernance() -> APIRouter:
         ),
     ):
         verifier_csrf(request, jeton_csrf)
-        pool = await create_gouvernance_web_pool()
+        pool = await create_tenant_pool(utilisateur.tenant_id)
         try:
             async with pool.acquire() as connexion:
                 await changer_role_utilisateur(
@@ -160,7 +160,7 @@ def construire_routes_gouvernance() -> APIRouter:
         ),
     ):
         verifier_csrf(request, jeton_csrf)
-        pool = await create_gouvernance_web_pool()
+        pool = await create_tenant_pool(utilisateur.tenant_id)
         try:
             async with pool.acquire() as connexion:
                 await desactiver_utilisateur(
@@ -188,7 +188,7 @@ def construire_routes_gouvernance() -> APIRouter:
         ),
     ):
         verifier_csrf(request, jeton_csrf)
-        pool = await create_gouvernance_web_pool()
+        pool = await create_tenant_pool(utilisateur.tenant_id)
         try:
             async with pool.acquire() as connexion:
                 await reactiver_utilisateur(

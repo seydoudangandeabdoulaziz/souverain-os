@@ -1372,3 +1372,18 @@ Réserves actées par le fondateur lors de la validation (inchangées, détaill�
 ## Règle
 
 Ne pas marquer une brique comme terminée uniquement parce que son code existe. La validation doit inclure tests, vérification manuelle et validation explicite du fondateur.
+
+## Correctif P0 — isolation PostgreSQL par identifiant tenant (13 novembre 2026)
+
+**État : implémentation corrigée et vérifiée en environnement scratch ; non appliquée à la base principale ; P0 non déclaré validé.** Les migrations principales restent en attente d'une autorisation distincte du fondateur.
+
+- B1 `0008_tenant_scoped_roles.sql` retire, pour les rôles tenant déterministes préexistants, les appartenances et ACL transversales avant d'accorder les droits minimaux. Elle échoue si un tel rôle possède déjà des objets. Les rôles restent `NOLOGIN` jusqu'au provisionnement explicite.
+- `tenant_roles.py` applique le même nettoyage idempotent lors du provisionnement ultérieur ; le script `provision_tenant_roles.py` exige maintenant `--expected-database`, vérifie la base connectée, garde les secrets hors de la sortie et écrit le mapping dans le `.env` avec le mode `0600`.
+- La séquence B1/B2/B3/B4/B5/B8 puis B1 `0006`/`0007`/`0008` a été exécutée sur PostgreSQL/TimescaleDB temporaire. Une simulation d'ACL inter-tenant et d'appartenance de rôle a été nettoyée par le rejeu de `0008`.
+- Preuves scratch : tests P0 `4/4` ; suite B1 `40 réussis, 3 ignorés` ; suite B1 ciblée P0 + intégrité `10 réussis` ; script de provisionnement exécuté deux fois, `4` rôles configurés à chaque fois, sortie sans secret et fichier scratch en mode `0600`.
+- Le parcours CLI tenant-scoped B3→B4→B5 a injecté `100` transactions synthétiques, enregistré `15` détections puis scoré `15` comptes (0 alerte au-dessus du seuil). Ce parcours a mis au jour une tentative B5 de créer un index sous le rôle runtime ; le DDL a été retiré du runtime au profit d'une vérification en lecture seule. La migration B5 reste la seule responsable de la table et de l'index.
+- Les fixtures des tests d'explication ont été mises à jour pour mocker le pool tenant-scoped au lieu de l'ancien pool global. La migration B5 reste seule responsable du DDL d'alertes ; les fixtures B7/B8 préparent ce schéma comme le ferait la migration. Suite transverse B1–B8 et tests applicatifs, sur PostgreSQL et Neo4j temporaires : **507 réussis, 20 ignorés**. Ruff sur les paquets concernés et mypy des sources B1–B8, de `souverain_app` et du script de provisionnement : sans erreur ; `git diff --check` propre.
+
+**Avant toute migration principale :** sauvegarde et restauration vérifiées, inventaire des rôles/ownership/ACL existants, application dans l'ordre documenté dans le README B1, provisionnement des secrets, puis preuves positives et négatives après migration. Le script de provisionnement complet n'a été exécuté que contre la base scratch.
+
+**Réserve opérationnelle distincte :** Prometheus cible encore l'adresse host-gateway tandis que l'application écoute sur `127.0.0.1`. Aucune exposition plus large n'a été activée ; un relais limité à `/metrics` doit être défini avant de rétablir cette collecte depuis le conteneur.

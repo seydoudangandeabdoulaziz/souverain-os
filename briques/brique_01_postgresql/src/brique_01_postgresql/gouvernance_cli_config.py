@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,20 +31,17 @@ class GouvernanceCliDbSettings(BaseSettings):
         env_file=_ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,
     )
 
     user: str = Field(default="souverain_gouvernance_cli")
-    password: str = Field(
-        default="change_me_gouvernance_cli",
-        description=(
-            "Mot de passe du rôle dédié CLI. Défaut de dev uniquement — "
-            "DOIT être changé (ALTER ROLE côté base + cette variable) "
-            "avant tout déploiement réel."
-        ),
+    password: SecretStr = Field(
+        min_length=32,
+        description="Secret dédié au rôle CLI, fourni explicitement.",
     )
     pool_min_size: int = Field(default=1)
     pool_max_size: int = Field(default=3)
 
 
 def get_gouvernance_cli_db_settings() -> GouvernanceCliDbSettings:
-    return GouvernanceCliDbSettings()
+    return GouvernanceCliDbSettings()  # type: ignore[call-arg]  # secret fourni par l'environnement

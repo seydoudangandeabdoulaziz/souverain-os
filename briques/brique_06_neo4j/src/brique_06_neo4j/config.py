@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -41,18 +41,14 @@ class Neo4jSettings(BaseSettings):
         env_file=_ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,
     )
 
     uri: str = Field(default="bolt://localhost:7687", description="URI Bolt Neo4j")
     user: str = Field(default="neo4j", description="Utilisateur Neo4j")
-    password: str = Field(
-        default="change_me",
-        description=(
-            "Mot de passe (jamais en dur en prod, via .env). Défaut aligné "
-            "sur celui de docker-compose.yml (NEO4J_AUTH) — un défaut "
-            "différent entre l'app et le conteneur provoque un échec "
-            "d'authentification silencieux si .env ne le surcharge pas."
-        ),
+    password: SecretStr = Field(
+        min_length=32,
+        description="Secret Neo4j dédié, fourni explicitement.",
     )
     database: str = Field(
         default="neo4j",
@@ -67,4 +63,4 @@ class Neo4jSettings(BaseSettings):
 
 def get_settings() -> Neo4jSettings:
     """Point d'entrée unique pour récupérer la configuration Neo4j."""
-    return Neo4jSettings()
+    return Neo4jSettings()  # type: ignore[call-arg]  # NEO4J_PASSWORD obligatoire

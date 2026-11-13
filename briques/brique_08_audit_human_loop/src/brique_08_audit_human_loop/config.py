@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,22 +35,20 @@ class AuditDbSettings(BaseSettings):
         env_file=_ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,
     )
 
     user: str = Field(
         default="souverain_brique8_audit",
         description="Rôle PostgreSQL dédié — doit correspondre au rôle créé par la migration 0001.",
     )
-    password: str = Field(
-        default="change_me_audit",
-        description=(
-            "Mot de passe du rôle dédié. Défaut de dev uniquement — DOIT être changé "
-            "(ALTER ROLE côté base + cette variable) avant tout déploiement réel."
-        ),
+    password: SecretStr = Field(
+        min_length=32,
+        description="Secret dédié fourni explicitement pour le rôle d'audit.",
     )
     pool_min_size: int = Field(default=1, description="Taille minimale du pool dédié")
     pool_max_size: int = Field(default=5, description="Taille maximale du pool dédié")
 
 
 def get_audit_db_settings() -> AuditDbSettings:
-    return AuditDbSettings()
+    return AuditDbSettings()  # type: ignore[call-arg]  # secret fourni par l'environnement

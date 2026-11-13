@@ -19,7 +19,7 @@ from __future__ import annotations
 from html import escape
 from uuid import UUID
 
-from brique_01_postgresql.connection import create_pool
+from brique_01_postgresql.connection import create_tenant_pool
 from brique_02_auth_rbac.rbac import Role, require_role
 from brique_02_auth_rbac.session import AuthenticatedUser
 from brique_05_scoring_alertes.seuils import POIDS_PAR_PATTERN, SEUIL_ALERTE
@@ -108,7 +108,7 @@ async def expliquer_alerte_route(
     # L'identité sert à contrôler l'accès ; elle n'est ni envoyée au modèle ni journalisée.
     del utilisateur
 
-    pool = await create_pool()
+    pool = await create_tenant_pool(tenant.tenant_id)
     alerte = await lecture.lire_alerte(pool, tenant.schema_name, alerte_id)
     if alerte is None:
         raise HTTPException(status_code=404, detail="erreur.non_trouve")

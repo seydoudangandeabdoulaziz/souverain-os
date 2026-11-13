@@ -59,7 +59,9 @@ def test_decode_token_rejects_expired_token() -> None:
         "iat": now - timedelta(hours=2),
         "exp": now - timedelta(hours=1),
     }
-    expired_token = jwt.encode(expired_payload, _SETTINGS.secret_key, algorithm=_SETTINGS.algorithm)
+    expired_token = jwt.encode(
+        expired_payload, _SETTINGS.secret_key.get_secret_value(), algorithm=_SETTINGS.algorithm
+    )
 
     with pytest.raises(ExpiredTokenError):
         decode_token(expired_token, _SETTINGS)
@@ -67,7 +69,9 @@ def test_decode_token_rejects_expired_token() -> None:
 
 def test_decode_token_rejects_missing_claims() -> None:
     incomplete_payload = {"sub": str(uuid.uuid4())}  # tenant_id/role/token_version manquants
-    token = jwt.encode(incomplete_payload, _SETTINGS.secret_key, algorithm=_SETTINGS.algorithm)
+    token = jwt.encode(
+        incomplete_payload, _SETTINGS.secret_key.get_secret_value(), algorithm=_SETTINGS.algorithm
+    )
 
     with pytest.raises(InvalidTokenError):
         decode_token(token, _SETTINGS)

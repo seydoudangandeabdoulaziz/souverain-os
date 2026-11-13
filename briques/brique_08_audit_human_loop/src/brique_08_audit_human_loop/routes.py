@@ -103,7 +103,7 @@ def construire_routes_audit() -> APIRouter:
         (auditor) — la vraie barrière de sécurité reste le RBAC de la
         route POST ci-dessous, ceci n'est qu'un affinage d'affichage.
         """
-        pool_audit = await create_audit_pool()
+        pool_audit = await create_audit_pool(tenant.tenant_id)
         try:
             historique = await lire_historique_audit(pool_audit, tenant.schema_name, alerte_id)
         except AuditNonProvisionne as exc:
@@ -144,7 +144,7 @@ def construire_routes_audit() -> APIRouter:
     ) -> object:
         verifier_csrf(request, jeton_csrf)
 
-        pool_audit = await create_audit_pool()
+        pool_audit = await create_audit_pool(tenant.tenant_id)
         try:
             await fermer_alerte_avec_audit(
                 pool_audit,

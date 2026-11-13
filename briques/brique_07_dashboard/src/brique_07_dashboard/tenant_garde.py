@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 import asyncpg
-from brique_01_postgresql.connection import create_pool
+from brique_01_postgresql.connection import create_runtime_pool
 from brique_02_auth_rbac.session import AuthenticatedUser
 from fastapi import Depends
 
@@ -47,7 +47,10 @@ async def tenant_valide(
             utilisateur invalide, pour ne pas donner d'indice
             distinctif à un attaquant sur la cause exacte du rejet.
     """
-    pool: asyncpg.Pool = await create_pool()
+    # Le contrôle de validité du tenant relève du rôle de contrôle, qui
+    # ne lit que le registre. N'ouvrir un pool métier qu'après ce contrôle
+    # évite de dépendre de secrets d'un tenant absent ou désactivé.
+    pool: asyncpg.Pool = await create_runtime_pool()
     async with pool.acquire() as connection:
         ligne = await connection.fetchrow(_REQUETE_TENANT, utilisateur.tenant_id)
 

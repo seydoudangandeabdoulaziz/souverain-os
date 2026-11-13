@@ -10,7 +10,6 @@ Règles :
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import UTC, datetime
 from typing import Any
@@ -26,7 +25,6 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from souverain_app.traductions.fr import TEXTES_FR
 
-from souverain_app import explication_ia as ia
 from souverain_app import explication_routes as routes
 
 _MESSAGE_403 = "Vous n'avez pas les droits nécessaires pour cette action."
@@ -69,26 +67,29 @@ def _construire(role: str, monkeypatch: pytest.MonkeyPatch) -> tuple[FastAPI, _C
         user_id=uuid4(), tenant_id=tenant.tenant_id, role=role, souverain_id=uuid4()
     )
 
-    def tenant_espion() -> MetadonneesTenant:
+    async def tenant_espion() -> MetadonneesTenant:
         contexte.appels_tenant += 1
         return tenant
 
-    async def pool_espion() -> object:
+    async def utilisateur_espion() -> AuthenticatedUser:
+        return utilisateur
+
+    async def pool_espion(_tenant_id: object) -> object:
         contexte.appels_pool += 1
         return object()
 
-    def ollama_espion(_url: str, _modele: str, faits: ia.FaitsAlerte, _timeout: float) -> str:
+    async def explication_espion(*_args: object, **_kwargs: object) -> tuple[str, bool]:
         contexte.appels_ollama += 1
-        return json.dumps({"claims": list(ia._identifiants_autorises(faits))})
+        return "Explication de test.", False
 
-    monkeypatch.setattr(routes, "create_pool", pool_espion)
+    monkeypatch.setattr(routes, "create_tenant_pool", pool_espion)
     monkeypatch.setattr(routes.lecture, "lire_alerte", AsyncMock(return_value=_alerte()))
-    monkeypatch.setattr(ia, "_requete_ollama_sync", ollama_espion)
+    monkeypatch.setattr(routes, "expliquer_alerte", explication_espion)
 
     app = FastAPI()
     app.include_router(routes.construire_routes_explication())
     app.dependency_overrides[routes.tenant_valide] = tenant_espion
-    app.dependency_overrides[routes.get_current_user_from_cookie] = lambda: utilisateur
+    app.dependency_overrides[routes.get_current_user_from_cookie] = utilisateur_espion
     return app, contexte
 
 

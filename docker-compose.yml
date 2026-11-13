@@ -21,7 +21,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-souverain_os}
       POSTGRES_USER: ${POSTGRES_USER:-souverain_admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Définir un mot de passe admin PostgreSQL}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -38,7 +38,7 @@ services:
     image: neo4j:5-community
     profiles: ["neo4j"]
     environment:
-      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-change_me}
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:?Définir un mot de passe Neo4j}
       # Configuration mémoire explicite (jamais les valeurs par défaut
       # de l'image) — estimée à l'analyse de la Brique 6 : ~1,5-2 Go
       # au total sur 16 Go disponibles, à confirmer par `docker stats`
@@ -66,7 +66,7 @@ services:
     volumes:
       - neo4j_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u ${NEO4J_USER:-neo4j} -p ${NEO4J_PASSWORD:-change_me} 'RETURN 1' || exit 1"]
+      test: ["CMD-SHELL", "cypher-shell -u ${NEO4J_USER:-neo4j} -p ${NEO4J_PASSWORD:?Définir un mot de passe Neo4j} 'RETURN 1' || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -133,8 +133,8 @@ services:
     image: grafana/grafana:13.2.1
     profiles: ["monitoring"]
     environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change_me_grafana}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?Définir le compte administrateur Grafana}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Définir un mot de passe Grafana}
       # Provisioning automatique de la source de données au démarrage
       # (Prometheus) — aucun dashboard pré-construit en MVP (décision
       # actée, éviter d'imposer une vision de dashboard non validée).
@@ -161,7 +161,7 @@ services:
       # MVP, pas un choix de sécurité optimal — DATA_SOURCE_PASS_FILE
       # (lecture depuis un fichier monté) existe et serait préférable
       # en industrialisation future, hors périmètre 4b.
-      DATA_SOURCE_PASS: ${MONITORING_DB_PASSWORD:-change_me_monitoring}
+      DATA_SOURCE_PASS: ${MONITORING_DB_PASSWORD:?Définir le mot de passe du rôle de monitoring}
     # Nouveau dans ce fichier : premier depends_on de tout le projet.
     # condition: service_healthy s'appuie sur le healthcheck déjà
     # existant du service postgres — évite un premier scrape en échec

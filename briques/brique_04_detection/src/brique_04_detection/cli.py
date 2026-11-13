@@ -18,7 +18,7 @@ import argparse
 import asyncio
 from collections import Counter
 
-from brique_01_postgresql.connection import close_pool, create_pool
+from brique_01_postgresql.connection import close_tenant_pools, create_tenant_pool_for_schema
 
 from brique_04_detection.lecture import lire_transactions_ordonnees
 from brique_04_detection.moteur import detecter_sequentiellement
@@ -40,7 +40,7 @@ def _construire_parser() -> argparse.ArgumentParser:
 
 
 async def executer(args: argparse.Namespace) -> None:
-    pool = await create_pool()
+    pool = await create_tenant_pool_for_schema(args.tenant)
     try:
         transactions = await lire_transactions_ordonnees(pool, args.tenant)
         print(f"{len(transactions)} transactions lues pour le tenant {args.tenant}")
@@ -56,7 +56,7 @@ async def executer(args: argparse.Namespace) -> None:
         nb_insere = await enregistrer_detections(pool, args.tenant, evenements)
         print(f"✅ {nb_insere} détections enregistrées dans {args.tenant}.detections")
     finally:
-        await close_pool()
+        await close_tenant_pools()
 
 
 def main() -> None:

@@ -9,11 +9,22 @@ unitaires dans un environnement sans Docker.
 
 from __future__ import annotations
 
+import json
+import os
+import secrets
 import uuid
 
 import pytest
 from brique_01_postgresql.config import PostgresSettings, get_settings
-from brique_01_postgresql.connection import close_pool, create_pool
+from brique_01_postgresql.connection import (
+    close_pool,
+    close_runtime_pool,
+    close_tenant_pools,
+    create_pool,
+    create_runtime_pool,
+)
+from brique_01_postgresql.tenant_provisioning import provision_tenant_schema
+from brique_01_postgresql.tenant_roles import provision_tenant_role
 from brique_02_auth_rbac.api import router as auth_router
 from brique_02_auth_rbac.password_hashing import hash_password
 from brique_02_auth_rbac.repository import (
@@ -25,6 +36,7 @@ from brique_02_auth_rbac.repository import (
 from brique_02_auth_rbac.souverain_id import generate_souverain_id
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from pydantic import ValidationError
 
 _TEST_TENANT_CODE = "ZZ"
 _TEST_EMAIL = "auth-test@example.com"
@@ -63,14 +75,18 @@ async def db_settings_or_skip() -> PostgresSettings:
     settings = get_settings()
     try:
         await create_pool(settings)
-    except ConnectionRefusedError:
+        await create_runtime_pool()
+    except (ConnectionRefusedError, ValidationError):
+        await close_pool()
+        await close_runtime_pool()
         pytest.skip(
-            "PostgreSQL non joignable — lancer "
-            "'docker compose --profile postgres up -d' pour exécuter ce test."
+            "PostgreSQL ou le rôle souverain_app non configuré — appliquer la migration "
+            "0006 et APP_POSTGRES_PASSWORD pour exécuter ce test."
         )
     else:
         yield settings
         await close_pool()
+        await close_runtime_pool()
 
 
 @pytest.fixture
@@ -80,6 +96,8 @@ async def test_user(db_settings_or_skip: PostgresSettings) -> dict:
     après le test (idempotent, rejouable sans intervention manuelle).
     """
     pool = await create_pool(db_settings_or_skip)
+    previous_credentials = os.environ.get("TENANT_DB_CREDENTIALS_JSON")
+    tenant_role: str | None = None
     async with pool.acquire() as conn:
         # Nettoyage préalable si une exécution précédente a échoué en cours de route.
         await conn.execute("DELETE FROM shared.users WHERE email = $1", _TEST_EMAIL)
@@ -96,6 +114,21 @@ async def test_user(db_settings_or_skip: PostgresSettings) -> dict:
             _TEST_TENANT_CODE,
         )
         tenant_id = tenant_row["tenant_id"]
+        await provision_tenant_schema(conn, "tenant_zz_test")
+        tenant_role = await provision_tenant_role(conn, tenant_id, "tenant_zz_test", "data")
+        tenant_password = secrets.token_hex(32)
+        alter_role = await conn.fetchval(
+            "SELECT format('ALTER ROLE %I LOGIN PASSWORD %L', $1::text, $2::text)",
+            tenant_role,
+            tenant_password,
+        )
+        await conn.execute(alter_role)
+        credentials = json.loads(os.environ.get("TENANT_DB_CREDENTIALS_JSON", "{}"))
+        credentials[str(tenant_id)] = {
+            "data_password": tenant_password,
+            "audit_password": tenant_password,
+        }
+        os.environ["TENANT_DB_CREDENTIALS_JSON"] = json.dumps(credentials)
 
         souverain_id = generate_souverain_id(_TEST_TENANT_CODE, _TEST_EMAIL)
         user = await create_user(
@@ -109,16 +142,30 @@ async def test_user(db_settings_or_skip: PostgresSettings) -> dict:
 
         yield {"tenant_id": tenant_id, "user": user}
 
+        await close_tenant_pools()
         await conn.execute("DELETE FROM shared.users WHERE email = $1", _TEST_EMAIL)
+        await conn.execute("DROP SCHEMA IF EXISTS tenant_zz_test CASCADE")
         await conn.execute(
             "DELETE FROM shared.tenants_registry WHERE tenant_code = $1", _TEST_TENANT_CODE
         )
+        if tenant_role is not None:
+            await conn.execute("DROP OWNED BY " + tenant_role)
+            await conn.execute("DROP ROLE IF EXISTS " + tenant_role)
+        if previous_credentials is None:
+            os.environ.pop("TENANT_DB_CREDENTIALS_JSON", None)
+        else:
+            os.environ["TENANT_DB_CREDENTIALS_JSON"] = previous_credentials
 
 
 async def test_login_with_correct_credentials_returns_token(test_user: dict) -> None:
     async with _build_client() as client:
         response = await client.post(
-            "/auth/login", json={"email": _TEST_EMAIL, "password": _TEST_PASSWORD}
+            "/auth/login",
+            json={
+                "tenant_code": _TEST_TENANT_CODE,
+                "email": _TEST_EMAIL,
+                "password": _TEST_PASSWORD,
+            },
         )
 
     assert response.status_code == 200
@@ -130,7 +177,12 @@ async def test_login_with_correct_credentials_returns_token(test_user: dict) -> 
 async def test_login_with_wrong_password_returns_401(test_user: dict) -> None:
     async with _build_client() as client:
         response = await client.post(
-            "/auth/login", json={"email": _TEST_EMAIL, "password": "mauvais-mot-de-passe"}
+            "/auth/login",
+            json={
+                "tenant_code": _TEST_TENANT_CODE,
+                "email": _TEST_EMAIL,
+                "password": "mauvais-mot-de-passe",
+            },
         )
 
     assert response.status_code == 401
@@ -142,7 +194,11 @@ async def test_login_with_unknown_email_returns_401(
     async with _build_client() as client:
         response = await client.post(
             "/auth/login",
-            json={"email": "inconnu@example.com", "password": "peu-importe"},
+            json={
+                "tenant_code": _TEST_TENANT_CODE,
+                "email": "inconnu@example.com",
+                "password": "peu-importe",
+            },
         )
 
     assert response.status_code == 401
@@ -151,7 +207,12 @@ async def test_login_with_unknown_email_returns_401(
 async def test_me_endpoint_returns_current_user(test_user: dict) -> None:
     async with _build_client() as client:
         login_response = await client.post(
-            "/auth/login", json={"email": _TEST_EMAIL, "password": _TEST_PASSWORD}
+            "/auth/login",
+            json={
+                "tenant_code": _TEST_TENANT_CODE,
+                "email": _TEST_EMAIL,
+                "password": _TEST_PASSWORD,
+            },
         )
         token = login_response.json()["access_token"]
 
@@ -180,7 +241,12 @@ async def test_token_revoked_after_password_change_via_token_version(
     """
     async with _build_client() as client:
         login_response = await client.post(
-            "/auth/login", json={"email": _TEST_EMAIL, "password": _TEST_PASSWORD}
+            "/auth/login",
+            json={
+                "tenant_code": _TEST_TENANT_CODE,
+                "email": _TEST_EMAIL,
+                "password": _TEST_PASSWORD,
+            },
         )
         token = login_response.json()["access_token"]
 
@@ -198,7 +264,12 @@ async def test_token_rejected_after_deactivation(
 ) -> None:
     async with _build_client() as client:
         login_response = await client.post(
-            "/auth/login", json={"email": _TEST_EMAIL, "password": _TEST_PASSWORD}
+            "/auth/login",
+            json={
+                "tenant_code": _TEST_TENANT_CODE,
+                "email": _TEST_EMAIL,
+                "password": _TEST_PASSWORD,
+            },
         )
         token = login_response.json()["access_token"]
 

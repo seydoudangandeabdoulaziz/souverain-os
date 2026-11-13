@@ -153,6 +153,12 @@ ORDER BY score DESC;
 
 - Validation anti-injection réutilisée de la Brique 1
   (`validate_schema_name`).
+- La table `alertes` et son index unique sont créés par la migration B5
+  `0001_create_alertes_table.sql` sous le rôle opérateur. Le pool runtime
+  tenant-scoped vérifie leur présence, mais n'exécute aucun DDL : le rôle
+  tenant n'est pas propriétaire de la table et ne doit pas le devenir.
+  Un schéma absent ou incomplet doit être provisionné avant le cycle de
+  scoring ; l'application n'utilise jamais le rôle admin pour réparer le DDL.
 - Table `alertes` suit la même convention de gouvernance que
   `transactions`/`detections` (tenant_id/country_code/data_classification
   dupliqués).

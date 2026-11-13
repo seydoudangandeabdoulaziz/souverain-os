@@ -1,24 +1,10 @@
-"""Fixtures partagées pour les tests d'intégration de la Brique 8.
-
-Même pattern que conftest.py de la Brique 7 : une vraie alerte via le
-pipeline Brique 4 -> Brique 5 déjà validé, jamais d'insertion SQL à la
-main. Deux différences propres à cette brique :
-
-1. tenant_provisionne accorde EN PLUS les privilèges du rôle
-   souverain_brique8_audit sur le schéma éphémère du test — la
-   migration 0001 ne couvre que les tenants déjà enregistrés AU MOMENT
-   de son exécution (même limite documentée pour les Briques 3/4/5), et
-   un tenant de test est créé APRÈS coup. Sans ce GRANT explicite ici,
-   pool_audit échouerait sur un tenant qui n'existait pas encore lors
-   de la migration.
-2. Une fixture pool_audit distincte du pool admin (create_pool) —
-   c'est PRÉCISÉMENT ce que ces tests doivent vérifier : que le rôle
-   restreint suffit à fermer une alerte et écrire l'audit, mais pas à
-   autre chose.
-"""
+"""Fixtures B8 utilisant une identité d'audit propre au tenant de test."""
 
 from __future__ import annotations
 
+import json
+import os
+import secrets
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
@@ -26,7 +12,9 @@ from uuid import UUID, uuid4
 import asyncpg
 import pytest_asyncio
 from brique_01_postgresql.connection import close_pool, create_pool
+from brique_01_postgresql.tenant_credentials import role_name_for_tenant
 from brique_01_postgresql.tenant_provisioning import provision_tenant_schema
+from brique_01_postgresql.tenant_roles import provision_tenant_role
 from brique_02_auth_rbac.password_hashing import hash_password
 from brique_02_auth_rbac.repository import UserRecord, create_user
 from brique_02_auth_rbac.souverain_id import generate_souverain_id
@@ -42,6 +30,56 @@ EMAIL_ANALYST_TEST = "audit-analyst-test@example.com"
 EMAIL_AUDITOR_TEST = "audit-auditor-test@example.com"
 MOT_DE_PASSE_TEST = "mot-de-passe-de-test-suffisamment-long"
 COMPTE_ALERTE_TEST = "compte_test_audit_01"
+
+
+async def _preparer_alertes_test(
+    connexion: asyncpg.Connection, schema_name: str
+) -> None:
+    """Simule le DDL opérateur de la migration B5 pour les fixtures B8."""
+    await connexion.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {schema_name}.alertes (
+            alerte_id UUID PRIMARY KEY,
+            tenant_id UUID NOT NULL,
+            country_code TEXT NOT NULL,
+            data_classification TEXT NOT NULL,
+            compte_pivot TEXT NOT NULL,
+            score INTEGER NOT NULL,
+            statut TEXT NOT NULL DEFAULT 'ouverte'
+                CHECK (statut IN ('ouverte', 'fermee')),
+            pattern_types_impliques TEXT[] NOT NULL,
+            detection_ids UUID[] NOT NULL,
+            fenetre_debut TIMESTAMPTZ NOT NULL,
+            fenetre_fin TIMESTAMPTZ NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            details JSONB
+        )
+        """
+    )
+    await connexion.execute(
+        f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{schema_name}_alertes_ouverte_compte "
+        f"ON {schema_name}.alertes (compte_pivot) WHERE statut = 'ouverte'"
+    )
+
+
+async def _preparer_role_test(
+    connexion: asyncpg.Connection, tenant_id: UUID, schema: str, purpose: str
+) -> str:
+    """Active le rôle tenant-scoped dans la base de test uniquement."""
+    role = await provision_tenant_role(connexion, tenant_id, schema, purpose)
+    secret = secrets.token_hex(32)
+    alter = await connexion.fetchval(
+        "SELECT format('ALTER ROLE %I LOGIN PASSWORD %L', $1::text, $2::text)",
+        role,
+        secret,
+    )
+    await connexion.execute(alter)
+    raw = os.environ.get("TENANT_DB_CREDENTIALS_JSON", "{}")
+    credentials = json.loads(raw)
+    credentials.setdefault(str(tenant_id), {})[f"{purpose}_password"] = secret
+    os.environ["TENANT_DB_CREDENTIALS_JSON"] = json.dumps(credentials)
+    return role
 
 
 @pytest_asyncio.fixture
@@ -61,7 +99,7 @@ async def pool_audit(
     tenant_provisionne pour garantir que les GRANT du tenant de test
     (voir cette fixture) ont déjà eu lieu avant toute connexion.
     """
-    p = await create_audit_pool()
+    p = await create_audit_pool(tenant_provisionne[0])
     try:
         yield p
     finally:
@@ -72,12 +110,9 @@ async def pool_audit(
 async def tenant_provisionne(pool: asyncpg.Pool) -> AsyncIterator[tuple[UUID, str]]:
     """(tenant_id, schema_name) éphémères, nettoyés après le test.
 
-    Accorde explicitement au rôle souverain_brique8_audit les mêmes
-    privilèges que la migration 0001 accorde aux tenants existants au
-    moment de son exécution — nécessaire car ce tenant n'existait pas
-    encore à ce moment-là (même limite déjà documentée pour les
-    migrations des Briques 3/4/5).
+    Crée un rôle d'audit tenant-scoped sans accès aux tables métier.
     """
+    previous_credentials = os.environ.get("TENANT_DB_CREDENTIALS_JSON")
     async with pool.acquire() as connexion:
         tenant_id: UUID = await connexion.fetchval(
             """
@@ -91,29 +126,26 @@ async def tenant_provisionne(pool: asyncpg.Pool) -> AsyncIterator[tuple[UUID, st
             TENANT_TEST,
         )
         await provision_tenant_schema(connexion, TENANT_TEST)
-
-        # audit_log est créée à la demande par persistence.py (auto-
-        # réparation via le pool admin) — pas de GRANT anticipé ici.
-        #
-        # ⚠️ GRANT sur alertes retiré d'ici : {tenant}.alertes n'existe
-        # PAS encore à ce stade (provision_tenant_schema ne crée que le
-        # schéma + transactions — alertes est créée paresseusement par
-        # enregistrer_scores() de la Brique 5, même limite déjà
-        # rencontrée et documentée pour TenantSansDonnees en Brique 7).
-        # Tenter le GRANT ici échouait avec UndefinedTableError. Le
-        # GRANT sur alertes est donc déplacé dans la fixture
-        # alerte_test, juste après la création réelle de la table.
-        await connexion.execute(f"GRANT USAGE ON SCHEMA {TENANT_TEST} TO souverain_brique8_audit")
+        data_role = await _preparer_role_test(connexion, tenant_id, TENANT_TEST, "data")
+        audit_role = await _preparer_role_test(connexion, tenant_id, TENANT_TEST, "audit")
 
     try:
         yield tenant_id, TENANT_TEST
     finally:
         async with pool.acquire() as connexion:
+            roles = (data_role, audit_role)
             await connexion.execute("DELETE FROM shared.users WHERE tenant_id = $1", tenant_id)
             await connexion.execute(f"DROP SCHEMA IF EXISTS {TENANT_TEST} CASCADE")
             await connexion.execute(
                 "DELETE FROM shared.tenants_registry WHERE schema_name = $1", TENANT_TEST
             )
+            for role in roles:
+                await connexion.execute("DROP OWNED BY " + role)
+                await connexion.execute(f"DROP ROLE IF EXISTS {role}")
+            if previous_credentials is None:
+                os.environ.pop("TENANT_DB_CREDENTIALS_JSON", None)
+            else:
+                os.environ["TENANT_DB_CREDENTIALS_JSON"] = previous_credentials
 
 
 @pytest_asyncio.fixture
@@ -160,6 +192,9 @@ async def alerte_test(
     _, schema_name = tenant_provisionne
     maintenant = datetime.now(UTC)
 
+    async with pool.acquire() as connexion:
+        await _preparer_alertes_test(connexion, schema_name)
+
     evenements = [
         DetectionEvent(
             pattern_type="compte_pivot",
@@ -197,14 +232,19 @@ async def alerte_test(
     )
     await enregistrer_scores(pool, schema_name, [score])
 
-    # {tenant}.alertes existe désormais réellement (créée par
-    # enregistrer_scores ci-dessus) — c'est SEULEMENT maintenant que le
-    # GRANT sur cette table peut réussir. Tenter ce GRANT plus tôt (dans
-    # tenant_provisionne, avant que la table existe) échouait avec
-    # UndefinedTableError — voir le commentaire retiré de cette fixture.
+    # {tenant}.alertes existe désormais réellement. Le privilège est
+    # accordé uniquement au rôle d'audit de ce tenant.
     async with pool.acquire() as connexion:
+        role = role_name_for_tenant((await connexion.fetchval(
+            "SELECT tenant_id FROM shared.tenants_registry WHERE schema_name = $1", schema_name
+        )), "audit")
+        grant = await connexion.fetchval(
+            "SELECT format('GRANT SELECT, UPDATE ON %I.alertes TO %I', $1::text, $2::text)",
+            schema_name,
+            role,
+        )
         await connexion.execute(
-            f"GRANT SELECT, UPDATE ON {schema_name}.alertes TO souverain_brique8_audit"
+            grant
         )
 
     async with pool.acquire() as connexion:

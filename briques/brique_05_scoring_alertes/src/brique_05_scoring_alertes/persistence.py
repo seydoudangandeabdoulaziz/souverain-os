@@ -39,30 +39,20 @@ _REQUETE_METADONNEES_TENANT = """
     WHERE schema_name = $1 AND is_active = true
 """
 
-_REQUETE_ASSURER_TABLE_ALERTES = """
-    CREATE TABLE IF NOT EXISTS {schema}.alertes (
-        alerte_id UUID PRIMARY KEY,
-        tenant_id UUID NOT NULL,
-        country_code TEXT NOT NULL,
-        data_classification TEXT NOT NULL,
-        compte_pivot TEXT NOT NULL,
-        score INTEGER NOT NULL,
-        statut TEXT NOT NULL DEFAULT 'ouverte'
-            CHECK (statut IN ('ouverte', 'fermee')),
-        pattern_types_impliques TEXT[] NOT NULL,
-        detection_ids UUID[] NOT NULL,
-        fenetre_debut TIMESTAMPTZ NOT NULL,
-        fenetre_fin TIMESTAMPTZ NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        details JSONB
-    );
-"""
-
-_REQUETE_ASSURER_INDEX_ALERTES_OUVERTE = """
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_{schema}_alertes_ouverte_compte
-    ON {schema}.alertes (compte_pivot)
-    WHERE statut = 'ouverte';
+_REQUETE_TABLE_ALERTES_EXISTE = "SELECT to_regclass($1) IS NOT NULL"
+_REQUETE_INDEX_ALERTE_UNIQUE_EXISTE = """
+    SELECT EXISTS (
+        SELECT 1
+        FROM pg_index AS i
+        JOIN pg_class AS index_relation ON index_relation.oid = i.indexrelid
+        JOIN pg_class AS table_relation ON table_relation.oid = i.indrelid
+        JOIN pg_namespace AS schema_relation ON schema_relation.oid = table_relation.relnamespace
+        WHERE schema_relation.nspname = $1
+          AND table_relation.relname = 'alertes'
+          AND index_relation.relname = $2
+          AND i.indisunique
+          AND i.indisvalid
+    )
 """
 
 _REQUETE_ALERTE_OUVERTE_EXISTANTE = """
@@ -123,10 +113,26 @@ async def recuperer_metadonnees_tenant(
 
 
 async def _assurer_tables(connexion: asyncpg.Connection, nom_schema_tenant: str) -> None:
-    await connexion.execute(_REQUETE_ASSURER_TABLE_ALERTES.format(schema=nom_schema_tenant))
-    await connexion.execute(
-        _REQUETE_ASSURER_INDEX_ALERTES_OUVERTE.format(schema=nom_schema_tenant)
+    """Vérifie le schéma préparé par migration sans exécuter de DDL métier.
+
+    Le rôle tenant-scoped n'est pas propriétaire de la table et ne doit pas
+    l'être : seul l'opérateur de migration crée les tables et index. Cette
+    vérification évite qu'un `CREATE INDEX IF NOT EXISTS` exige l'ownership
+    et échoue sous le rôle runtime, ou pousse l'application à utiliser admin.
+    """
+    table_existe = await connexion.fetchval(
+        _REQUETE_TABLE_ALERTES_EXISTE, f"{nom_schema_tenant}.alertes"
     )
+    index_existe = await connexion.fetchval(
+        _REQUETE_INDEX_ALERTE_UNIQUE_EXISTE,
+        nom_schema_tenant,
+        f"idx_{nom_schema_tenant}_alertes_ouverte_compte",
+    )
+    if not table_existe or not index_existe:
+        raise RuntimeError(
+            "Schéma d'alertes non provisionné ou incomplet pour le tenant; "
+            "appliquer la migration B5 0001 avant le cycle de scoring."
+        )
 
 
 async def _upserter_alerte(

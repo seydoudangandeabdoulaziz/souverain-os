@@ -25,7 +25,10 @@ _pool: asyncpg.Pool | None = None
 def _build_dsn() -> str:
     pg = get_settings()
     gouvernance = get_gouvernance_cli_db_settings()
-    return f"postgresql://{gouvernance.user}:{gouvernance.password}@{pg.host}:{pg.port}/{pg.db}"
+    return (
+        f"postgresql://{gouvernance.user}:{gouvernance.password.get_secret_value()}@"
+        f"{pg.host}:{pg.port}/{pg.db}"
+    )
 
 
 async def create_gouvernance_cli_pool() -> asyncpg.Pool:

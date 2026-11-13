@@ -18,7 +18,7 @@ from __future__ import annotations
 from uuid import UUID
 
 import asyncpg
-from brique_01_postgresql.connection import create_pool
+from brique_01_postgresql.connection import create_tenant_pool
 from brique_02_auth_rbac.session import AuthenticatedUser
 from brique_06_neo4j import requetes as requetes_graphe
 from brique_06_neo4j.connexion import create_driver
@@ -41,7 +41,7 @@ def construire_routes_alertes(templates: Jinja2Templates) -> APIRouter:
         tenant: MetadonneesTenant = Depends(tenant_valide),  # noqa: B008
         utilisateur: AuthenticatedUser = Depends(get_current_user_from_cookie),  # noqa: B008
     ) -> object:
-        pool = await create_pool()
+        pool = await create_tenant_pool(tenant.tenant_id)
         alertes = await lecture.lister_alertes_ouvertes(pool, tenant.schema_name)
         langue = langue_pour_pays(tenant.country_code)
 
@@ -58,7 +58,7 @@ def construire_routes_alertes(templates: Jinja2Templates) -> APIRouter:
         tenant: MetadonneesTenant = Depends(tenant_valide),  # noqa: B008
         utilisateur: AuthenticatedUser = Depends(get_current_user_from_cookie),  # noqa: B008
     ) -> object:
-        pool = await create_pool()
+        pool = await create_tenant_pool(tenant.tenant_id)
         alerte = await lecture.lire_alerte(pool, tenant.schema_name, alerte_id)
 
         if alerte is None:
@@ -86,7 +86,7 @@ def construire_routes_alertes(templates: Jinja2Templates) -> APIRouter:
         évite une deuxième lecture de {tenant}.alertes pour la même
         information.
         """
-        pool = await create_pool()
+        pool = await create_tenant_pool(tenant.tenant_id)
         driver = await create_driver()
         tenant_id_str = str(tenant.tenant_id)
 

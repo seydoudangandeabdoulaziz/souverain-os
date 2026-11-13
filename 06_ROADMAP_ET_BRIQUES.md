@@ -55,6 +55,8 @@ Ordre consolidé après la revue d'architecture des 6 et 7 septembre 2026.
 | 11 | PQC (ML-KEM + ML-DSA) | Non commencée |
 | 12 | Résilience inter-États (conception) | Non commencée |
 
+**Prérequis transversal avant l'étape 9 :** le correctif P0 d'identités PostgreSQL dédiées par tenant est appliqué à la base principale et validé techniquement le 13 novembre 2026. La migration 0008, le provisionnement des rôles, les connexions dédiées aux trois tenants et le retrait des privilèges de `souverain_app` sur leurs schémas ont été vérifiés. Les tests ciblés donnent 3 réussis et 4 ignorés. La validation fonctionnelle complète de tous les parcours applicatifs reste distincte.
+
 Aucune étape 6C n'existe. Le fondateur a validé la conception de l'étape 7
 dans le seul périmètre du MVP RAG et sous réserve des sujets reportés aux étapes
 correspondantes. Le pilote expérimental du lot 8a.1 a été autorisé et exécuté ;

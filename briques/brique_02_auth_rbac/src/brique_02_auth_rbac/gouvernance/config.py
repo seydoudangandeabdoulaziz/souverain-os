@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -41,6 +41,7 @@ class GouvernanceCookieSettings(BaseSettings):
         env_file=_ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,
     )
 
     cookie_name: str = Field(default="souverain_session")
@@ -55,7 +56,7 @@ class GouvernanceWebDbSettings(BaseSettings):
     )
 
     user: str = Field(default="souverain_gouvernance_web")
-    password: str = Field(default="change_me_gouvernance_web")
+    password: SecretStr = Field(min_length=32, description="Secret dédié fourni explicitement.")
     pool_min_size: int = Field(default=1)
     pool_max_size: int = Field(default=5)
 
@@ -65,4 +66,4 @@ def get_gouvernance_cookie_settings() -> GouvernanceCookieSettings:
 
 
 def get_gouvernance_web_db_settings() -> GouvernanceWebDbSettings:
-    return GouvernanceWebDbSettings()
+    return GouvernanceWebDbSettings()  # type: ignore[call-arg]  # secret fourni par l'environnement

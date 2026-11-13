@@ -16,14 +16,14 @@ DEUX cas (200 et 503) sont des comportements valides à vérifier).
 from __future__ import annotations
 
 import pytest_asyncio
-from brique_01_postgresql.connection import close_pool
+from brique_01_postgresql.connection import close_runtime_pool
 from httpx import ASGITransport, AsyncClient
 from souverain_app.main import creer_application_complete
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def _fermer_pool_admin_apres_chaque_test():
-    """Ferme le pool admin (singleton, brique_01_postgresql.connection)
+async def _fermer_pool_runtime_apres_chaque_test():
+    """Ferme le pool runtime (singleton, brique_01_postgresql.connection)
     après chaque test — sinon un pool créé dans la boucle asyncio d'un
     test fuit vers le suivant (boucle différente, pytest-asyncio étant
     scope function par défaut). Même bug déjà rencontré et corrigé
@@ -31,7 +31,7 @@ async def _fermer_pool_admin_apres_chaque_test():
     gouvernance V2) — reproduit ici par oubli, corrigé de la même
     façon."""
     yield
-    await close_pool()
+    await close_runtime_pool()
 
 
 async def test_health_repond_toujours_avec_un_corps_json_coherent() -> None:

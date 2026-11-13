@@ -67,7 +67,7 @@ def create_access_token(
         "iat": now,
         "exp": now + timedelta(hours=settings.expiration_hours),
     }
-    return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
+    return jwt.encode(payload, settings.secret_key.get_secret_value(), algorithm=settings.algorithm)
 
 
 def decode_token(token: str, settings: JwtSettings) -> TokenPayload:
@@ -80,7 +80,9 @@ def decode_token(token: str, settings: JwtSettings) -> TokenPayload:
             manquants/malformés.
     """
     try:
-        raw_payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        raw_payload = jwt.decode(
+            token, settings.secret_key.get_secret_value(), algorithms=[settings.algorithm]
+        )
     except jwt.ExpiredSignatureError as exc:
         raise ExpiredTokenError(
             "Le jeton a expiré, une nouvelle connexion est nécessaire."

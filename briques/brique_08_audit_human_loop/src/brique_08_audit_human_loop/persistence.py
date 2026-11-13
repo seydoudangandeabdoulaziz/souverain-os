@@ -25,10 +25,10 @@ from uuid import UUID, uuid4
 
 import asyncpg
 from brique_01_postgresql.connection import create_pool as create_pool_admin
+from brique_01_postgresql.tenant_credentials import role_name_for_tenant
 from brique_01_postgresql.tenant_provisioning import validate_schema_name
 
 from brique_08_audit_human_loop.diagnostic import (
-    ROLE_AUDIT,
     DiagnosticAudit,
     diagnostiquer_audit,
     lire_diagnostic,
@@ -87,7 +87,7 @@ class ResultatFermeture:
 
 
 async def _appliquer_contrat(
-    connexion: asyncpg.Connection, schema: str, avant: DiagnosticAudit
+    connexion: asyncpg.Connection, schema: str, role_audit: str, avant: DiagnosticAudit
 ) -> list[str]:
     """Crée/accorde UNIQUEMENT les éléments constatés manquants (liste fermée).
 
@@ -100,13 +100,13 @@ async def _appliquer_contrat(
         await connexion.execute(_REQUETE_ASSURER_INDEX_AUDIT_LOG.format(schema=schema))
         repares.append("audit_log")
     if not avant.usage_schema:
-        await connexion.execute(_GRANT_USAGE.format(schema=schema, role=ROLE_AUDIT))
+        await connexion.execute(_GRANT_USAGE.format(schema=schema, role=role_audit))
         repares.append("usage_schema")
     if not (avant.audit_log_existe and avant.audit_log_insert and avant.audit_log_select):
-        await connexion.execute(_GRANT_AUDIT_LOG.format(schema=schema, role=ROLE_AUDIT))
+        await connexion.execute(_GRANT_AUDIT_LOG.format(schema=schema, role=role_audit))
         repares.append("audit_log_privileges")
     if avant.alertes_existe and not (avant.alertes_select and avant.alertes_update):
-        await connexion.execute(_GRANT_ALERTES.format(schema=schema, role=ROLE_AUDIT))
+        await connexion.execute(_GRANT_ALERTES.format(schema=schema, role=role_audit))
         repares.append("alertes_privileges")
     return repares
 
@@ -150,10 +150,17 @@ async def provisionner_audit(nom_schema_tenant: str) -> list[str]:
                 "SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))",
                 f"souverain:b8_audit:{nom_schema_tenant}",
             )
+            tenant_id = await connexion.fetchval(
+                "SELECT tenant_id FROM shared.tenants_registry WHERE schema_name = $1",
+                nom_schema_tenant,
+            )
+            if tenant_id is None:
+                raise AuditNonProvisionne(RaisonAudit.SCHEMA_ABSENT)
+            role_audit = role_name_for_tenant(tenant_id, "audit")
             avant = await lire_diagnostic(connexion, nom_schema_tenant)
             _refuser_si_inprovisionnable(nom_schema_tenant, avant)
 
-            repares = await _appliquer_contrat(connexion, nom_schema_tenant, avant)
+            repares = await _appliquer_contrat(connexion, nom_schema_tenant, role_audit, avant)
 
             apres = await lire_diagnostic(connexion, nom_schema_tenant)
             if apres.anomalie_audit_log:

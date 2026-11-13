@@ -25,7 +25,10 @@ réparés, vide si le schéma était déjà conforme.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
+import secrets
 from collections.abc import AsyncIterator
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -34,12 +37,19 @@ from uuid import UUID, uuid4
 import asyncpg
 import pytest
 import pytest_asyncio
-from brique_01_postgresql.connection import close_pool, create_pool
+from brique_01_postgresql.connection import (
+    close_pool,
+    close_runtime_pool,
+    close_tenant_pools,
+    create_pool,
+)
 from brique_01_postgresql.gouvernance_cli_connection import (
     close_gouvernance_cli_pool,
     create_gouvernance_cli_pool,
 )
+from brique_01_postgresql.tenant_credentials import role_name_for_tenant
 from brique_01_postgresql.tenant_governance import create_tenant
+from brique_01_postgresql.tenant_roles import provision_tenant_role
 from brique_02_auth_rbac.config import get_jwt_settings
 from brique_02_auth_rbac.jwt_tokens import create_access_token
 from brique_02_auth_rbac.password_hashing import hash_password
@@ -51,7 +61,6 @@ from brique_05_scoring_alertes.modeles import ScoreCompte
 from brique_05_scoring_alertes.persistence import enregistrer_scores
 from brique_07_dashboard.config import get_dashboard_settings
 from brique_08_audit_human_loop import cli
-from brique_08_audit_human_loop.config import get_audit_db_settings
 from brique_08_audit_human_loop.connection import close_audit_pool, create_audit_pool
 from brique_08_audit_human_loop.diagnostic import DiagnosticAudit
 from brique_08_audit_human_loop.lecture import lire_historique_audit
@@ -93,8 +102,14 @@ async def _ne_rien_fermer() -> None:
     singleton, que la fixture `pool` (et le nettoyage) utilisent encore."""
 
 
+_ROLE_AUDIT_TENANT: str | None = None
+_ROLE_DATA_TENANT: str | None = None
+
+
 def _role_b8() -> str:
-    return get_audit_db_settings().user
+    if _ROLE_AUDIT_TENANT is None:
+        raise RuntimeError("La fixture tenant_neuf doit d'abord créer le rôle d'audit tenant")
+    return _ROLE_AUDIT_TENANT
 
 
 async def _nettoyer(pool: asyncpg.Pool) -> None:
@@ -109,6 +124,49 @@ async def _nettoyer(pool: asyncpg.Pool) -> None:
         await connexion.execute(
             "DELETE FROM shared.tenants_registry WHERE schema_name = $1", TENANT_NEUF
         )
+        for role in (_ROLE_DATA_TENANT, _ROLE_AUDIT_TENANT):
+            if role and await connexion.fetchval(
+                "SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1)", role
+            ):
+                await connexion.execute("DROP OWNED BY " + role)
+                await connexion.execute("DROP ROLE IF EXISTS " + role)
+
+
+async def _creer_role_audit_sans_acl(
+    connexion: asyncpg.Connection, tenant_id: UUID
+) -> tuple[str, str]:
+    """Rend le rôle authentifiable sans lui accorder encore l'accès au schéma."""
+    role = role_name_for_tenant(tenant_id, "audit")
+    secret = secrets.token_hex(32)
+    create = await connexion.fetchval(
+        """SELECT format('CREATE ROLE %I LOGIN PASSWORD %L NOINHERIT NOSUPERUSER '
+        'NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS', $1::text, $2::text)""",
+        role,
+        secret,
+    )
+    await connexion.execute(create)
+    await connexion.execute(
+        "INSERT INTO shared.tenant_login_map(role_name, tenant_id, purpose) "
+        "VALUES ($1, $2, 'audit')",
+        role,
+        tenant_id,
+    )
+    database = await connexion.fetchval("SELECT current_database()")
+    grant_connect = await connexion.fetchval(
+        "SELECT format('GRANT CONNECT ON DATABASE %I TO %I', $1::text, $2::text)",
+        database,
+        role,
+    )
+    await connexion.execute(grant_connect)
+    await connexion.execute("GRANT USAGE ON SCHEMA shared TO " + role)
+    await connexion.execute("GRANT SELECT ON shared.users TO " + role)
+    await connexion.execute(
+        "GRANT EXECUTE ON FUNCTION shared.current_login_tenant_id() TO " + role
+    )
+    credentials = json.loads(os.environ.get("TENANT_DB_CREDENTIALS_JSON", "{}"))
+    credentials.setdefault(str(tenant_id), {})["audit_password"] = secret
+    os.environ["TENANT_DB_CREDENTIALS_JSON"] = json.dumps(credentials)
+    return role, secret
 
 
 @pytest_asyncio.fixture
@@ -127,6 +185,7 @@ async def tenant_neuf(pool: asyncpg.Pool) -> AsyncIterator[UUID]:
     Le setup est dans le `try` : si une assertion de garde échoue, le nettoyage
     s'exécute quand même (pas de tenant orphelin dans le registre).
     """
+    previous_credentials = os.environ.get("TENANT_DB_CREDENTIALS_JSON")
     await _nettoyer(pool)
     pool_cli = await create_gouvernance_cli_pool()
     try:
@@ -139,6 +198,27 @@ async def tenant_neuf(pool: asyncpg.Pool) -> AsyncIterator[UUID]:
                 data_classification="confidential",
                 acteur_declare="test automatisé (test_tenant_neuf)",
             )
+            global _ROLE_AUDIT_TENANT
+            global _ROLE_DATA_TENANT
+            _ROLE_AUDIT_TENANT = role_name_for_tenant(tenant_id, "audit")
+
+        async with pool.acquire() as connexion:
+            _ROLE_DATA_TENANT = await provision_tenant_role(
+                connexion, tenant_id, TENANT_NEUF, "data"
+            )
+            data_secret = secrets.token_hex(32)
+            alter_data_role = await connexion.fetchval(
+                "SELECT format('ALTER ROLE %I LOGIN PASSWORD %L', $1::text, $2::text)",
+                _ROLE_DATA_TENANT,
+                data_secret,
+            )
+            await connexion.execute(alter_data_role)
+            credentials = json.loads(os.environ.get("TENANT_DB_CREDENTIALS_JSON", "{}"))
+            credentials.setdefault(str(tenant_id), {})["data_password"] = data_secret
+            os.environ["TENANT_DB_CREDENTIALS_JSON"] = json.dumps(credentials)
+
+        async with pool.acquire() as connexion:
+            await _creer_role_audit_sans_acl(connexion, tenant_id)
 
         # Garde-fou : l'état de départ est bien celui d'un tenant neuf.
         async with pool.acquire() as connexion:
@@ -155,11 +235,15 @@ async def tenant_neuf(pool: asyncpg.Pool) -> AsyncIterator[UUID]:
     finally:
         await _nettoyer(pool)
         await close_gouvernance_cli_pool()
+        if previous_credentials is None:
+            os.environ.pop("TENANT_DB_CREDENTIALS_JSON", None)
+        else:
+            os.environ["TENANT_DB_CREDENTIALS_JSON"] = previous_credentials
 
 
 @pytest_asyncio.fixture
 async def pool_audit_neuf(tenant_neuf: UUID) -> AsyncIterator[asyncpg.Pool]:
-    p = await create_audit_pool()
+    p = await create_audit_pool(tenant_neuf)
     try:
         yield p
     finally:
@@ -195,6 +279,8 @@ async def client_auditor_neuf(pool: asyncpg.Pool, tenant_neuf: UUID) -> AsyncIte
     finally:
         # Pool dédié B8 = singleton créé par la route ; un pool par boucle asyncio de test.
         await close_audit_pool()
+        await close_tenant_pools()
+        await close_runtime_pool()
 
 
 async def _creer_alerte(pool: asyncpg.Pool, schema_name: str) -> UUID:
@@ -204,6 +290,35 @@ async def _creer_alerte(pool: asyncpg.Pool, schema_name: str) -> UUID:
     fait ici : c'est précisément la situation d'un tenant neuf.
     """
     maintenant = datetime.now(UTC)
+    # La migration B5 est normalement responsable de ce DDL. Ce test crée
+    # toutefois un tenant neuf après les migrations, donc prépare son schéma
+    # comme le ferait le provisionnement opérateur avant le scoring.
+    async with pool.acquire() as connexion:
+        await connexion.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {schema_name}.alertes (
+                alerte_id UUID PRIMARY KEY,
+                tenant_id UUID NOT NULL,
+                country_code TEXT NOT NULL,
+                data_classification TEXT NOT NULL,
+                compte_pivot TEXT NOT NULL,
+                score INTEGER NOT NULL,
+                statut TEXT NOT NULL DEFAULT 'ouverte'
+                    CHECK (statut IN ('ouverte', 'fermee')),
+                pattern_types_impliques TEXT[] NOT NULL,
+                detection_ids UUID[] NOT NULL,
+                fenetre_debut TIMESTAMPTZ NOT NULL,
+                fenetre_fin TIMESTAMPTZ NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                details JSONB
+            )
+            """
+        )
+        await connexion.execute(
+            f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{schema_name}_alertes_ouverte_compte "
+            f"ON {schema_name}.alertes (compte_pivot) WHERE statut = 'ouverte'"
+        )
     evenements = [
         DetectionEvent(
             pattern_type=pattern,
@@ -598,13 +713,27 @@ async def test_c4_tous_continue_apres_un_echec_et_retourne_le_code_1(
         return []
 
     monkeypatch.setattr(cli, "provisionner_audit", faux_provisionner)
+    extra_schema = f"tenant_extra_{uuid4().hex[:8]}"
     async with pool.acquire() as connexion:
+        await connexion.execute(
+            "INSERT INTO shared.tenants_registry "
+            "(tenant_code, country_code, schema_name, data_classification, is_active) "
+            "VALUES ($1, 'NE', $2, 'confidential', true)",
+            f"C4-{uuid4().hex[:8]}",
+            extra_schema,
+        )
         nb_actifs = await connexion.fetchval(
             "SELECT count(*) FROM shared.tenants_registry WHERE is_active"
         )
-    assert nb_actifs >= 2, "il faut au moins deux tenants actifs pour ce scénario"
+    assert nb_actifs >= 2, "le test doit créer deux tenants actifs dans sa base isolée"
 
-    assert await cli._executer(None, True) == cli.CODE_ECHEC
+    try:
+        assert await cli._executer(None, True) == cli.CODE_ECHEC
+    finally:
+        async with pool.acquire() as connexion:
+            await connexion.execute(
+                "DELETE FROM shared.tenants_registry WHERE schema_name = $1", extra_schema
+            )
 
     sortie = capsys.readouterr()
     assert "échec (SCHEMA_ABSENT)" in sortie.err

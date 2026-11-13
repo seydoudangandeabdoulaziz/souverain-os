@@ -9,14 +9,26 @@ que les données réelles.
 
 from __future__ import annotations
 
+import json
+import os
+import secrets
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import asyncpg
+import pytest
 import pytest_asyncio
-from brique_01_postgresql.connection import close_pool, create_pool
+from brique_01_postgresql.connection import (
+    close_pool,
+    close_runtime_pool,
+    close_tenant_pools,
+    create_pool,
+    create_runtime_pool,
+)
+from brique_01_postgresql.tenant_credentials import role_name_for_tenant
 from brique_01_postgresql.tenant_provisioning import provision_tenant_schema
+from brique_01_postgresql.tenant_roles import provision_tenant_role
 from brique_02_auth_rbac.config import get_jwt_settings
 from brique_02_auth_rbac.jwt_tokens import create_access_token
 from brique_02_auth_rbac.password_hashing import hash_password
@@ -31,12 +43,54 @@ from brique_07_dashboard.app import creer_application
 from brique_07_dashboard.config import get_dashboard_settings
 from httpx import ASGITransport, AsyncClient
 from neo4j import AsyncDriver
+from pydantic import ValidationError
 
 TENANT_TEST = "tenant_test_dashboard"
 TENANT_CODE_TEST = "ZZ"
 EMAIL_TEST = "dashboard-test@example.com"
 MOT_DE_PASSE_TEST = "mot-de-passe-de-test-suffisamment-long"
 COMPTE_ALERTE_TEST = "compte_test_dashboard_01"
+
+
+async def _preparer_alertes_test(
+    connexion: asyncpg.Connection, schema_name: str
+) -> None:
+    """Simule la migration opérateur B5 pour le tenant de fixture."""
+    await connexion.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {schema_name}.alertes (
+            alerte_id UUID PRIMARY KEY,
+            tenant_id UUID NOT NULL,
+            country_code TEXT NOT NULL,
+            data_classification TEXT NOT NULL,
+            compte_pivot TEXT NOT NULL,
+            score INTEGER NOT NULL,
+            statut TEXT NOT NULL DEFAULT 'ouverte'
+                CHECK (statut IN ('ouverte', 'fermee')),
+            pattern_types_impliques TEXT[] NOT NULL,
+            detection_ids UUID[] NOT NULL,
+            fenetre_debut TIMESTAMPTZ NOT NULL,
+            fenetre_fin TIMESTAMPTZ NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            details JSONB
+        )
+        """
+    )
+    await connexion.execute(
+        f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{schema_name}_alertes_ouverte_compte "
+        f"ON {schema_name}.alertes (compte_pivot) WHERE statut = 'ouverte'"
+    )
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def fermer_pools_lies_a_la_boucle() -> AsyncIterator[None]:
+    """Évite qu'un singleton asyncpg/Neo4j survive à la boucle d'un test."""
+    yield
+    await close_tenant_pools()
+    await close_runtime_pool()
+    await close_pool()
+    await close_driver()
 
 
 @pytest_asyncio.fixture
@@ -60,6 +114,8 @@ async def driver() -> AsyncIterator[AsyncDriver]:
 @pytest_asyncio.fixture
 async def tenant_provisionne(pool: asyncpg.Pool) -> AsyncIterator[tuple[UUID, str]]:
     """(tenant_id, schema_name) éphémères, nettoyés après le test."""
+    previous_credentials = os.environ.get("TENANT_DB_CREDENTIALS_JSON")
+    role: str | None = None
     async with pool.acquire() as connexion:
         tenant_id: UUID = await connexion.fetchval(
             """
@@ -73,16 +129,35 @@ async def tenant_provisionne(pool: asyncpg.Pool) -> AsyncIterator[tuple[UUID, st
             TENANT_TEST,
         )
         await provision_tenant_schema(connexion, TENANT_TEST)
+        role = await provision_tenant_role(connexion, tenant_id, TENANT_TEST, "data")
+        password = secrets.token_hex(32)
+        alter = await connexion.fetchval(
+            "SELECT format('ALTER ROLE %I LOGIN PASSWORD %L', $1::text, $2::text)",
+            role,
+            password,
+        )
+        await connexion.execute(alter)
+        credentials = json.loads(os.environ.get("TENANT_DB_CREDENTIALS_JSON", "{}"))
+        credentials.setdefault(str(tenant_id), {})["data_password"] = password
+        os.environ["TENANT_DB_CREDENTIALS_JSON"] = json.dumps(credentials)
 
     try:
         yield tenant_id, TENANT_TEST
     finally:
+        await close_tenant_pools()
         async with pool.acquire() as connexion:
             await connexion.execute("DELETE FROM shared.users WHERE tenant_id = $1", tenant_id)
             await connexion.execute(f"DROP SCHEMA IF EXISTS {TENANT_TEST} CASCADE")
             await connexion.execute(
                 "DELETE FROM shared.tenants_registry WHERE schema_name = $1", TENANT_TEST
             )
+            if role:
+                await connexion.execute("DROP OWNED BY " + role)
+                await connexion.execute(f"DROP ROLE IF EXISTS {role}")
+        if previous_credentials is None:
+            os.environ.pop("TENANT_DB_CREDENTIALS_JSON", None)
+        else:
+            os.environ["TENANT_DB_CREDENTIALS_JSON"] = previous_credentials
 
 
 @pytest_asyncio.fixture
@@ -111,6 +186,9 @@ async def alerte_test(
     """
     _, schema_name = tenant_provisionne
     maintenant = datetime.now(UTC)
+
+    async with pool.acquire() as connexion:
+        await _preparer_alertes_test(connexion, schema_name)
 
     evenements = [
         DetectionEvent(
@@ -152,6 +230,20 @@ async def alerte_test(
         details={"compte_pivot": 30, "micro_fractionnement": 20},
     )
     await enregistrer_scores(pool, schema_name, [score])
+    async with pool.acquire() as connexion:
+        tenant_id = await connexion.fetchval(
+            "SELECT tenant_id FROM shared.tenants_registry WHERE schema_name = $1", schema_name
+        )
+        role = role_name_for_tenant(tenant_id, "data")
+        grant = await connexion.fetchval(
+            """SELECT format(
+                'GRANT SELECT,INSERT,UPDATE ON ALL TABLES IN SCHEMA %I TO %I',
+                $1::text, $2::text
+            )""",
+            schema_name,
+            role,
+        )
+        await connexion.execute(grant)
 
 
 @pytest_asyncio.fixture
@@ -169,6 +261,9 @@ async def alertes_table_creee_sans_alerte(
     _, schema_name = tenant_provisionne
     maintenant = datetime.now(UTC)
 
+    async with pool.acquire() as connexion:
+        await _preparer_alertes_test(connexion, schema_name)
+
     score = ScoreCompte(
         compte_pivot="compte_jamais_alerte",
         score=10,  # < SEUIL_ALERTE (50) : table créée, aucune ligne insérée
@@ -179,6 +274,20 @@ async def alertes_table_creee_sans_alerte(
         details={"flux_frontalier": 10},
     )
     await enregistrer_scores(pool, schema_name, [score])
+    async with pool.acquire() as connexion:
+        tenant_id = await connexion.fetchval(
+            "SELECT tenant_id FROM shared.tenants_registry WHERE schema_name = $1", schema_name
+        )
+        role = role_name_for_tenant(tenant_id, "data")
+        grant = await connexion.fetchval(
+            """SELECT format(
+                'GRANT SELECT,INSERT,UPDATE ON ALL TABLES IN SCHEMA %I TO %I',
+                $1::text, $2::text
+            )""",
+            schema_name,
+            role,
+        )
+        await connexion.execute(grant)
 
 
 @pytest_asyncio.fixture
@@ -202,6 +311,14 @@ async def client(
     second l'a fait. Même précaution que la fixture `driver` elle-même,
     manquante ici jusqu'à cette correction.
     """
+    try:
+        await create_runtime_pool()
+    except (ConnectionRefusedError, ValidationError):
+        pytest.skip(
+            "Le rôle souverain_app n'est pas configuré — appliquer la migration 0006 "
+            "et APP_POSTGRES_PASSWORD avant les tests d'intégration web."
+        )
+
     app = creer_application()
     jwt_settings = get_jwt_settings()
     dashboard_settings = get_dashboard_settings()
@@ -222,4 +339,5 @@ async def client(
         ) as ac:
             yield ac
     finally:
+        await close_runtime_pool()
         await close_driver()

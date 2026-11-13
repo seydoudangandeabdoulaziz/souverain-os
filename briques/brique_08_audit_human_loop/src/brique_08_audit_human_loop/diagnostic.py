@@ -22,11 +22,8 @@ from dataclasses import dataclass
 
 import asyncpg
 from brique_01_postgresql.connection import create_pool as create_pool_admin
+from brique_01_postgresql.tenant_credentials import role_name_for_tenant
 from brique_01_postgresql.tenant_provisioning import validate_schema_name
-
-# Rôle PostgreSQL dédié créé par la migration 0001 — même nom que dans les
-# GRANT de persistence.py (une seule source de vérité).
-ROLE_AUDIT = "souverain_brique8_audit"
 
 _REQUETE_EXISTENCE = """
     SELECT
@@ -103,18 +100,23 @@ async def lire_diagnostic(connexion: asyncpg.Connection, nom_schema_tenant: str)
     que pour des objets dont l'existence vient d'être constatée.
     """
     validate_schema_name(nom_schema_tenant)
+    tenant_id = await connexion.fetchval(
+        "SELECT tenant_id FROM shared.tenants_registry WHERE schema_name = $1",
+        nom_schema_tenant,
+    )
+    role_audit = role_name_for_tenant(tenant_id, "audit") if tenant_id else "sov_a_missing"
     cible_audit_log = f"{nom_schema_tenant}.audit_log"
     cible_alertes = f"{nom_schema_tenant}.alertes"
 
     existence = await connexion.fetchrow(
-        _REQUETE_EXISTENCE, ROLE_AUDIT, nom_schema_tenant, cible_audit_log, cible_alertes
+        _REQUETE_EXISTENCE, role_audit, nom_schema_tenant, cible_audit_log, cible_alertes
     )
     assert existence is not None  # un SELECT sans FROM retourne toujours une ligne
     role_et_schema = bool(existence["role_existe"] and existence["schema_existe"])
 
     usage = False
     if role_et_schema:
-        usage = bool(await connexion.fetchval(_REQUETE_USAGE, ROLE_AUDIT, nom_schema_tenant))
+        usage = bool(await connexion.fetchval(_REQUETE_USAGE, role_audit, nom_schema_tenant))
 
     # Les privilèges de TABLE sont indépendants de USAGE sur le schéma :
     # on les lit dès que le rôle et la table existent (sinon une anomalie
@@ -127,13 +129,13 @@ async def lire_diagnostic(connexion: asyncpg.Connection, nom_schema_tenant: str)
         "truncate_": False,
     }
     if role_et_schema and existence["audit_log_existe"]:
-        ligne = await connexion.fetchrow(_REQUETE_PRIVILEGES_AUDIT_LOG, ROLE_AUDIT, cible_audit_log)
+        ligne = await connexion.fetchrow(_REQUETE_PRIVILEGES_AUDIT_LOG, role_audit, cible_audit_log)
         assert ligne is not None
         audit = dict(ligne)
 
     alertes: dict[str, bool] = {"select_": False, "update_": False}
     if role_et_schema and existence["alertes_existe"]:
-        ligne = await connexion.fetchrow(_REQUETE_PRIVILEGES_ALERTES, ROLE_AUDIT, cible_alertes)
+        ligne = await connexion.fetchrow(_REQUETE_PRIVILEGES_ALERTES, role_audit, cible_alertes)
         assert ligne is not None
         alertes = dict(ligne)
 

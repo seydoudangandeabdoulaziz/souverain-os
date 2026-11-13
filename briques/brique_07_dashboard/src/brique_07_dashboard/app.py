@@ -8,8 +8,13 @@ traductions/__init__.py pour la règle complète.
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
+from brique_01_postgresql.config import get_runtime_settings
+from brique_01_postgresql.connection import close_runtime_pool, close_tenant_pools
+from brique_02_auth_rbac.config import get_jwt_settings
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -27,7 +32,23 @@ _logger = logging.getLogger("brique_07_dashboard")
 
 
 def creer_application() -> FastAPI:
-    app = FastAPI(title="SOUVERAIN-OS — Dashboard", docs_url=None, redoc_url=None)
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        # Validation avant d'accepter toute requête : aucun rôle ou secret par défaut.
+        get_jwt_settings()
+        get_runtime_settings()
+        try:
+            yield
+        finally:
+            await close_tenant_pools()
+            await close_runtime_pool()
+
+    app = FastAPI(
+        title="SOUVERAIN-OS — Dashboard",
+        docs_url=None,
+        redoc_url=None,
+        lifespan=lifespan,
+    )
 
     templates = Jinja2Templates(directory=str(_REPERTOIRE_BASE / "templates"))
     templates.env.globals["t"] = t

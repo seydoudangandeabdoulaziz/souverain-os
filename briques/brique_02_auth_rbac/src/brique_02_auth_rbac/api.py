@@ -14,7 +14,7 @@ remettre en cause ce qui est livré ici.
 
 from __future__ import annotations
 
-from brique_01_postgresql.connection import create_pool
+from brique_01_postgresql.connection import create_runtime_pool, create_tenant_pool
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 
@@ -28,6 +28,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 class LoginRequest(BaseModel):
+    tenant_code: str
     email: EmailStr
     password: str
 
@@ -61,7 +62,17 @@ async def login(
     credentials: LoginRequest,
     jwt_settings: JwtSettings = Depends(get_jwt_settings),  # noqa: B008 — pattern FastAPI standard
 ) -> LoginResponse:
-    pool = await create_pool()
+    control_pool = await create_runtime_pool()
+    async with control_pool.acquire() as connection:
+        tenant_id = await connection.fetchval(
+            "SELECT tenant_id FROM shared.tenants_registry "
+            "WHERE tenant_code = $1 AND is_active = true",
+            credentials.tenant_code.strip().upper(),
+        )
+    if tenant_id is None:
+        raise _invalid_credentials()
+
+    pool = await create_tenant_pool(tenant_id)
     async with pool.acquire() as connection:
         user = await get_user_by_email(connection, credentials.email)
 

@@ -14,7 +14,7 @@ validée) : c'est un nouvel adaptateur, pas une réécriture.
 
 from __future__ import annotations
 
-from brique_01_postgresql.connection import create_pool
+from brique_01_postgresql.connection import create_tenant_pool
 from brique_02_auth_rbac.config import JwtSettings, get_jwt_settings
 from brique_02_auth_rbac.jwt_tokens import ExpiredTokenError, InvalidTokenError, decode_token
 from brique_02_auth_rbac.repository import get_user_by_id
@@ -57,7 +57,7 @@ async def get_current_user_from_cookie(
     except (ExpiredTokenError, InvalidTokenError) as exc:
         raise SessionInvalide("Session invalide, merci de vous reconnecter.") from exc
 
-    pool = await create_pool()
+    pool = await create_tenant_pool(payload.tenant_id)
     async with pool.acquire() as connection:
         user = await get_user_by_id(connection, payload.user_id)
 

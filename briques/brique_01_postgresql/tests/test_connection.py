@@ -16,16 +16,24 @@ Deux catégories, clairement séparées :
 
 from __future__ import annotations
 
+from uuid import UUID
+
 import pytest
 from brique_01_postgresql.config import PostgresSettings, get_settings
 from brique_01_postgresql.connection import close_pool, create_pool
 from brique_01_postgresql.healthcheck_db import run_db_healthcheck
+from brique_01_postgresql.tenant_credentials import (
+    TenantCredentialSettings,
+    get_tenant_role_credentials,
+    role_name_for_tenant,
+)
 from brique_01_postgresql.tenant_provisioning import (
     InvalidSchemaNameError,
     provision_tenant_schema,
     render_tenant_schema_sql,
     validate_schema_name,
 )
+from pydantic import ValidationError
 
 # ============================================================
 # Tests UNITAIRES — aucune base de données requise
@@ -68,9 +76,23 @@ def test_render_tenant_schema_sql_rejects_unsafe_name() -> None:
 
 
 def test_settings_defaults_are_sane() -> None:
-    settings = PostgresSettings(_env_file=None)  # ignore le .env local pour ce test
+    settings = PostgresSettings(
+        _env_file=None, host="localhost", port=5432, db="souverain_os",
+        user="souverain_admin", password="test-only-password"
+    )
     assert settings.port == 5432
     assert settings.pool_min_size <= settings.pool_max_size
+
+
+def test_settings_exige_mot_de_passe_admin_et_masque_sa_repr(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "mot-de-passe-synthetique-pour-test-123"
+    monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
+    with pytest.raises(ValidationError):
+        PostgresSettings(_env_file=None)
+    settings = PostgresSettings(_env_file=None, password=secret)
+    assert secret not in repr(settings)
 
 
 def test_settings_dsn_format() -> None:
@@ -87,6 +109,36 @@ def test_settings_dsn_format() -> None:
 
 def test_get_settings_returns_postgres_settings_instance() -> None:
     assert isinstance(get_settings(), PostgresSettings)
+
+
+def test_role_name_tenant_est_deterministe_et_distinct_par_tenant() -> None:
+    tenant_a = UUID("11111111-1111-4111-8111-111111111111")
+    tenant_b = UUID("22222222-2222-4222-8222-222222222222")
+    assert (
+        role_name_for_tenant(tenant_a, "data")
+        == "sov_t_11111111111141118111111111111111"
+    )
+    assert (
+        role_name_for_tenant(tenant_a, "audit")
+        == "sov_a_11111111111141118111111111111111"
+    )
+    assert role_name_for_tenant(tenant_a, "data") != role_name_for_tenant(tenant_b, "data")
+
+
+def test_identifiants_tenant_sont_lus_sans_exposer_le_secret() -> None:
+    tenant_id = UUID("11111111-1111-4111-8111-111111111111")
+    secret = "synthetic-tenant-db-secret-with-at-least-32-chars"
+    settings = TenantCredentialSettings(
+        _env_file=None,
+        credentials_json=(
+            '{"11111111-1111-4111-8111-111111111111":'
+            '{"data_password":"' + secret + '","audit_password":"' + secret + '"}}'
+        ),
+    )
+    credentials = get_tenant_role_credentials(tenant_id, "data", settings=settings)
+    assert credentials.username == role_name_for_tenant(tenant_id, "data")
+    assert credentials.password.get_secret_value() == secret
+    assert secret not in repr(credentials)
 
 
 # ============================================================
