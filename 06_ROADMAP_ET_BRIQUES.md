@@ -50,12 +50,14 @@ Ordre consolidé après la revue d'architecture des 6 et 7 septembre 2026.
 | 6 | Ollama/Mistral (→ Ministral 3 8B) | 6a **validée** (20 octobre 2026), 6b **validée** (30 octobre 2026) |
 | 7 | Sécurité IA/RAG (conception du MVP RAG) | Validée par le fondateur — conception et périmètre uniquement ; réserves conservées |
 | 8 | RAG | **Socle technique validé sur données synthétiques** (8 novembre 2026) ; aucune validation de pertinence sur corpus réel autorisé |
-| 9 | Redis/Celery (conditionnel à l'étape 5) | Non commencée |
+| 9 | Redis/Celery (conditionnel à l'étape 5) | **Non requise — condition de l'étape 5 non remplie** (14 novembre 2026) |
 | 10 | SOUVERAIN-ID complet | Non commencée |
 | 11 | PQC (ML-KEM + ML-DSA) | Non commencée |
 | 12 | Résilience inter-États (conception) | Non commencée |
 
 **Prérequis transversal avant l'étape 9 :** le correctif P0 d'identités PostgreSQL dédiées par tenant est appliqué à la base principale et validé techniquement le 13 novembre 2026. La migration 0008, le provisionnement des rôles, les connexions dédiées aux trois tenants et le retrait des privilèges de `souverain_app` sur leurs schémas ont été vérifiés. Les tests ciblés donnent 3 réussis et 4 ignorés. La validation fonctionnelle complète de tous les parcours applicatifs reste distincte.
+
+**Étape 9 — non requise (14 novembre 2026, décision du fondateur).** La condition de l'étape 5 n'est pas remplie : jusqu'à 50 000 transactions, B4 + B5 ont pris 2,3 s au total, B3→B6 ont atteint 1 440 tx/s (cible du document fondateur : environ 13,9 tx/s), la latence HTTP est restée stable (p50 ≈ 120 ms, 0 erreur sur 13 750 requêtes). Aucun code ni service n'a été ajouté. Ce n'est pas un abandon : l'étape se rouvre par décision explicite si l'un des quatre critères de réouverture (latence, durée de traitement, multi-processus, reprise) est démontré par une mesure reproductible. Preuves, limites et critères détaillés : `avancement.md`, « Détail — Étape 9 ». Les alternatives sans nouveau composant (verrou consultatif PostgreSQL de D7, tâche d'arrière-plan, table de tâches PostgreSQL) sont à évaluer avant toute réouverture.
 
 Aucune étape 6C n'existe. Le fondateur a validé la conception de l'étape 7
 dans le seul périmètre du MVP RAG et sous réserve des sujets reportés aux étapes

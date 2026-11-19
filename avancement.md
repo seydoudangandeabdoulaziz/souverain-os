@@ -47,7 +47,7 @@ VALIDÉE
 | 6 | Ollama/Mistral (→ Ministral 3 8B, voir détail) | 6a VALIDÉE (20 octobre 2026), 6b **VALIDÉE** le 30 octobre 2026 par le fondateur — lot v2 sans échec bloquant, suite complète 486/486, vérifications avec de vraies sessions (`analyst`, `auditor`) ; réserves ouvertes, voir le détail |
 | 7 | Sécurité IA/RAG (conception du MVP RAG) | **VALIDÉE par le fondateur** — conception et périmètre fonctionnel/sécuritaire uniquement ; réserves conservées |
 | 8 | RAG | **VALIDÉE — socle technique sur données synthétiques** (8 novembre 2026, fondateur) ; corpus réel autorisé non validé ni ingéré |
-| 9 | Redis/Celery (conditionnel à l'étape 5) | NON COMMENCÉE |
+| 9 | Redis/Celery (conditionnel à l'étape 5) | **NON REQUISE — condition de l'étape 5 non remplie** (14 novembre 2026, sur décision du fondateur ; voir « Détail — Étape 9 ») |
 | 10 | SOUVERAIN-ID complet | NON COMMENCÉE |
 | 11 | PQC (ML-KEM + ML-DSA) | NON COMMENCÉE |
 | 12 | Résilience inter-États (conception) | NON COMMENCÉE |
@@ -1368,6 +1368,54 @@ Limites et points non traités (signalés, pas oubliés) :
 Réserves actées par le fondateur lors de la validation (inchangées, détaillées ci-dessus) : (1) migration `0001` de B8 à examiner séparément ; (2) affichage HTMX du 503 côté Brique 7 ; (3) provisionnement des nouveaux tenants toujours manuel.
 
 **Correction post-validation de la Brique 8 (provisionnement de l'audit) VALIDÉE le 17 octobre 2026, par le fondateur (Seydou Dangande Abdoul Aziz), sur ThinkPad X1 Carbon Gen 6.**
+
+## Détail — Étape 9 : Redis/Celery — NON REQUISE
+
+**Statut : NON REQUISE — condition de l'étape 5 non remplie.** Décision du fondateur (Seydou Dangande Abdoul Aziz) du 14 novembre 2026. Ce n'est ni une validation ni un abandon définitif : l'étape reste réouvrable selon les critères ci-dessous. Aucun code, aucune dépendance, aucun service Compose et aucune configuration n'ont été ajoutés pour cette étape.
+
+**Pourquoi l'étape était conditionnelle.** La roadmap la déclarait « conditionnelle à l'étape 5 » (test de charge) : Redis/Celery n'est justifié que si la charge mesurée montre que le traitement synchrone actuel est insuffisant. La conception de l'étape 7 (`docs/ETAPE_7_CONCEPTION.md`, tableau des étapes) la classe « Non requise (D7) » et précise que Redis/Celery n'est **pas** une dépendance de la concurrence IA/RAG (D7 appliquée : concurrence en mémoire, un seul traitement simultané avec refus rapide, déploiement mono-processus).
+
+**Preuves (étape 5, validée le 19 septembre 2026, machine de développement unique) :**
+
+| Palier | Volume | B3 | B4 | B5 | B6 | Débit global B3→B6 | Scénario C p50 / p95 |
+|---|---|---|---|---|---|---|---|
+| 1 | 5 000 | 2,216 s | 0,908 s | 0,777 s | 8,367 s | 408 tx/s | 119,8 / 205,0 ms |
+| 2 | 20 000 | 5,278 s | 1,099 s | 0,730 s | 9,210 s | 1 225 tx/s | 121,3 / 195,6 ms |
+| 3 | 50 000 | 13,421 s | 1,699 s | 0,588 s | 19,026 s | 1 440 tx/s | 120,5 / 208,0 ms |
+
+- Aucune dégradation jusqu'à 50 000 transactions : le débit global s'améliore avec le volume (coût fixe de B6 amorti).
+- Pour 50 000 transactions, B4 + B5 (détection + scoring) ont pris 2,3 s au total. La cible du document fondateur est de 50 000 transactions/heure, soit environ 13,9 tx/s : le débit mesuré en est environ cent fois supérieur.
+- 0 erreur HTTP sur 13 750 requêtes cumulées (scénario C, lecture B7/B8) ; latence stable autour de 120 ms (p50).
+- RAM PostgreSQL stable entre paliers. La croissance de la RAM Neo4j (998 Mo → 1,51 Go, plafond `heap_max=1G` + `pagecache=512m` presque atteint) est un point de vigilance **distinct** : une file de tâches ne le résoudrait pas.
+- Le pipeline n'a jamais produit de goulot qu'une file de tâches aurait levé. Ajouter Redis + Celery créerait un service de plus, une surface d'attaque (secret, réseau, rôle) et des tests supplémentaires, sans besoin mesuré.
+
+**Limites de ces preuves (à ne pas masquer) :** une seule machine ; données synthétiques ; B3→B6 mesurés comme jobs batch CLI séquentiels ; le scénario C ne mesure que des lectures HTTP (aucune écriture concurrente, aucune ingestion par API) ; 0 alerte réelle produite (limite du générateur, déjà documentée en Brique 5). La conclusion « non requise » vaut pour le pipeline **tel qu'il existe**, pas pour une API d'ingestion/scoring qui n'est pas encore construite.
+
+**Critères de réouverture.** L'étape 9 ne se rouvre que par décision explicite du fondateur, appuyée sur au moins une mesure reproductible (protocole, environnement et résultats consignés, comme à l'étape 5) montrant l'un des cas suivants :
+1. **Latence** : le p95 d'un appel synchrone d'ingestion ou de scoring de l'API dépasse 5 s (cible « scoring < 5 secondes » du document fondateur), ou le débit soutenu mesuré tombe sous 50 000 transactions/heure, sur un volume représentatif et avec des écritures concurrentes.
+2. **Durée de traitement** : un traitement déclenché depuis l'API dépasse environ 30 s et doit être rendu asynchrone (réponse « accepté » puis suivi d'état).
+3. **Multi-processus** : le déploiement exige plusieurs processus ou plusieurs workers, de sorte que la concurrence en mémoire de D7 ne suffit plus.
+4. **Reprise** : un besoin de relance automatique, d'ordonnancement ou de reprise sur échec est établi et ne peut pas être couvert par une commande CLI planifiée.
+
+**Avant toute réouverture :** évaluer d'abord les alternatives sans nouveau composant — verrou consultatif PostgreSQL (D7, option 2, déjà conçue), tâche d'arrière-plan dans le processus, ou table de tâches PostgreSQL consommée par `FOR UPDATE SKIP LOCKED`. Si Redis/Celery reste nécessaire : ADR dédié ; périmètre et estimation mémoire validés avant tout code ; profile Compose dédié, lié à `127.0.0.1` ; authentification Redis et secret hors Git ; identité PostgreSQL du worker limitée au tenant concerné (rôles tenant dédiés et RLS du correctif P0, sans retour à un rôle transversal) ; isolation des messages par `tenant_id` ; aucune donnée sensible dans les messages ni dans les journaux.
+
+**Inchangé :** les décisions historiques (D7, section 8 et 9 des décisions verrouillées, ADR existants) ne sont pas modifiées. Les étapes 10, 11 et 12 ne sont pas commencées.
+
+## Chantier transverse — API d'ingestion/scoring (Brique 9)
+
+**Statut : PRÊT POUR LA VALIDATION DU FONDATEUR, AVEC RÉSERVES — NON VALIDÉ (16 novembre 2026).** Hors de l'ordre numéroté. Périmètre validé par le fondateur (option 2 pour le rôle PostgreSQL `pipeline`, conditions du 14 novembre) ; le cycle incrémental reste **non validé** tant que les tests différentiels et les mesures sur la machine du fondateur ne sont pas concluants. Détail, mesures et décisions ouvertes : `docs/API_INGESTION_SCORING_PERIMETRE.md` (§9). Local uniquement : aucun commit, aucun push, aucune migration sur la base principale.
+
+- **Brique 1 (extension additive)** : migration `0009_tenant_pipeline_role.sql` (CHECK de `tenant_login_map.purpose`), but `pipeline` dans `tenant_credentials.py` / `tenant_roles.py` (liste blanche, `NOLOGIN`, aucun `CREATE`/`DELETE`/accès `shared.users`), `create_tenant_pipeline_pool`, option `--with-pipeline` (désactivée par défaut). Rôles `data` et `audit` inchangés (vérifié par test).
+- **Brique 9** (nouveau paquet) : identité technique `shared.api_clients` (portées `ingest`/`cycle`, Argon2id, rotation/révocation par CLI), jeton court à clé dédiée, ingestion idempotente `(source, external_id)` garantie par la base avec conflit explicite, cycle incrémental par compte (B4 et B5 inchangés), verrous consultatifs PostgreSQL, journaux sans donnée sensible.
+- **Branchement** : un `include_router` additif dans `souverain_app` (non exécuté ici : dépendances RAG/Neo4j absentes du bac à sable).
+- **Tests** (bac à sable, PostgreSQL 16 + TimescaleDB 2.17.2 réels) : B1 14 nouveaux + 4 P0 inchangés, B9 58, tous réussis ; Ruff et mypy propres. Les autres suites (B1 à B8, RAG, `souverain_app`) n'ont **pas** été rejouées. `uv.lock` non régénéré (`uv sync --all-packages` requis, nouveau membre du workspace).
+- **Mesures** : seuils atteints (cycle, ingestion, mémoire) de 77 k à 576 k transactions ; **cycle p95 non atteint pour des comptes à activité continue en mode exact** (3,4 s contre 2 s). Un plafond de relecture optionnel (`SOUVERAIN_API_EPISODE_MAX_HEURES`) borne le coût au prix de lignes de détection supplémentaires (jusqu'à environ 30 % dans le cas extrême), sans épisode perdu. Décision du fondateur requise.
+- **Défaut trouvé et corrigé par la mesure** : parcours de tous les chunks de l'hypertable à chaque cycle (borne basse globale ajoutée : 1,28 s → 0,22 s à 576 k).
+- **Mesure sur la machine du fondateur (ThinkPad, conteneur jetable), 16 novembre 2026** : 58 tests réussis. Scénario dense 77 k (5 000 comptes) : cycle p95 3,76 s et ingestion p95 1,07 s, **seuils non atteints** (contre 1,3 s et 0,12 s dans le bac à sable). Diagnostic : le moteur B4 seul est environ 2,9 fois plus lent sur cette machine (2,13 s contre 0,74 s pour 52 k transactions, gouverneur `powersave`) ; l'ingestion est environ 10 fois plus lente, écart non expliqué par le seul processeur (soupçon : latence d'écriture disque, à isoler par `pg_test_fsync`).
+- **Seconde mesure sur la machine du fondateur (même scénario 77 k, 5 000 comptes, version optimisée), 16 novembre 2026** : 60 tests réussis ; cycle p50 0,93 s, p95 1,09 s (max 2,86 s) ; ingestion p95 0,356 s ; mémoire 23 Mo ; **seuils atteints** pour ce scénario. Ventilation du cycle : chargement de l'historique 0,58 s, moteur B4 0,27 s, scoring 0,04 s. Latence d'une validation disque : environ 2,7 ms (533 ms pour 200 validations), le disque n'est donc pas en cause. **Attribution impossible à ce stade** : la première mesure (3,76 s / 1,07 s) a été prise avec un load average de 3,2 et un gouverneur `powersave` ; le gain de 3,4 fois sur le cycle est bien supérieur à celui mesuré pour la modification de code (environ 7 % dans le bac à sable), il est donc très probablement dû à l'état de la machine. Une seule exécution par version : la variance n'est pas établie.
+- **Campagne complète sur la machine du fondateur (16 novembre 2026)** : seuils atteints pour 77 k dense (3 passages : cycle p95 1,09 à 1,33 s), 244 k (0,66 s) et 576 k (0,80 s) ; **non atteints** pour 300 comptes très actifs en mode exact (5,41 s) et avec plafond 12 h (3,44 s). Le scoring B5 y pèse 2,4 s par cycle (une transaction par alerte ouverte, réécrite à chaque cycle) : risque d'échelle lié au nombre d'alertes ouvertes, décision du fondateur requise (B5 non modifié). Le plafond d'épisode multiplie les lignes de détection (+135 % dans ce scénario). Détail : `docs/API_INGESTION_SCORING_PERIMETRE.md` (§9 bis). Scénario mixte (30 agents très actifs portant 15 % des transactions + 20 000 comptes ordinaires), mesuré sur la machine du fondateur en mode exact : cycle p95 0,82 s, ingestion p95 0,46 s, mémoire 13 Mo, seuils atteints. Réserves à lever ou à accepter : voir `docs/API_INGESTION_SCORING_PERIMETRE.md` (§9 bis, statut).
+- **Optimisations du 16 novembre** (cycle.py) : borne par compte indexée par dictionnaire (suppression d'une recherche quadratique), relecture de l'historique par tranches (temps propre de `_charger_episodes` divisé par ~2 au profil). Nouveau test du chargement contre un oracle indépendant (`test_chargement_episodes.py`) : une tranche manquante ou un écart d'épisode erroné sont détectés (la comparaison des détections, volontairement tolérante, ne les détectait pas). Suite B9 : 60 tests réussis dans le bac à sable et sur la machine du fondateur.
+- **Restant avant validation** : rejouer `benchmarks/bench_pg.py` sur la machine du fondateur (50 k / 200 k / 500 k / comptes très actifs) ; décision sur le plafond ; autorisation avant toute migration sur la base principale ; sauvegarde/restauration vérifiées et inventaire des rôles avant provisionnement réel (conditions P0).
 
 ## Règle
 
