@@ -22,6 +22,7 @@ members = [
     "brique-06-neo4j",
     "brique-07-dashboard",
     "brique-08-audit-human-loop",
+    "brique-09-api-pipeline",
     "souverain-app",
     "souverain-generateur",
     "souverain-os",
@@ -524,6 +525,55 @@ dev = [
     { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
     { name = "ruff", specifier = ">=0.6" },
+]
+
+[[package]]
+name = "brique-09-api-pipeline"
+version = "0.1.0"
+source = { editable = "briques/brique_09_api_pipeline" }
+dependencies = [
+    { name = "asyncpg" },
+    { name = "brique-01-postgresql" },
+    { name = "brique-02-auth-rbac" },
+    { name = "brique-04-detection" },
+    { name = "brique-05-scoring-alertes" },
+    { name = "fastapi" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "pyjwt" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "httpx" },
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "ruff" },
+    { name = "souverain-generateur" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "asyncpg", specifier = ">=0.29.0" },
+    { name = "brique-01-postgresql", editable = "briques/brique_01_postgresql" },
+    { name = "brique-02-auth-rbac", editable = "briques/brique_02_auth_rbac" },
+    { name = "brique-04-detection", editable = "briques/brique_04_detection" },
+    { name = "brique-05-scoring-alertes", editable = "briques/brique_05_scoring_alertes" },
+    { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "pydantic", specifier = ">=2.8.0" },
+    { name = "pydantic-settings", specifier = ">=2.5.0" },
+    { name = "pyjwt", specifier = ">=2.9.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "mypy", specifier = ">=1.11" },
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+    { name = "ruff", specifier = ">=0.6" },
+    { name = "souverain-generateur", editable = "briques/brique_03_generateur_ingestion" },
 ]
 
 [[package]]
@@ -2220,6 +2270,7 @@ dependencies = [
     { name = "brique-05-scoring-alertes" },
     { name = "brique-07-dashboard" },
     { name = "brique-08-audit-human-loop" },
+    { name = "brique-09-api-pipeline" },
     { name = "fastapi" },
     { name = "prometheus-client" },
     { name = "souverain-rag" },
@@ -2239,6 +2290,7 @@ requires-dist = [
     { name = "brique-05-scoring-alertes", editable = "briques/brique_05_scoring_alertes" },
     { name = "brique-07-dashboard", editable = "briques/brique_07_dashboard" },
     { name = "brique-08-audit-human-loop", editable = "briques/brique_08_audit_human_loop" },
+    { name = "brique-09-api-pipeline", editable = "briques/brique_09_api_pipeline" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "prometheus-client", specifier = ">=0.21.0" },
     { name = "souverain-rag", editable = "rag" },

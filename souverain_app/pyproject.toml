@@ -17,6 +17,7 @@ dependencies = [
     "brique-02-auth-rbac",
     "brique-07-dashboard",
     "brique-08-audit-human-loop",
+    "brique-09-api-pipeline",
     "fastapi>=0.115.0",
     "uvicorn>=0.30.0",
     "prometheus-client>=0.21.0",
@@ -30,6 +31,7 @@ brique-02-auth-rbac = { workspace = true }
 brique-05-scoring-alertes = { workspace = true }
 brique-07-dashboard = { workspace = true }
 brique-08-audit-human-loop = { workspace = true }
+brique-09-api-pipeline = { workspace = true }
 souverain-rag = { workspace = true }
 
 [project.scripts]

@@ -39,6 +39,7 @@ members = [
     "briques/brique_06_neo4j",
     "briques/brique_07_dashboard",
     "briques/brique_08_audit_human_loop",
+    "briques/brique_09_api_pipeline",
     "rag",
     "souverain_app",
 ]

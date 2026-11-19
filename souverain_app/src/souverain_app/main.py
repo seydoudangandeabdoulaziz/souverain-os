@@ -44,6 +44,7 @@ from brique_01_postgresql.healthcheck_db import run_runtime_db_healthcheck
 from brique_02_auth_rbac.gouvernance.routes import construire_routes_gouvernance
 from brique_07_dashboard.app import creer_application
 from brique_08_audit_human_loop.routes import construire_routes_audit
+from brique_09_api_pipeline.routes import construire_routes_pipeline
 from fastapi import FastAPI, Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from starlette.responses import JSONResponse
@@ -76,6 +77,7 @@ def creer_application_complete() -> FastAPI:
     app.include_router(construire_routes_gouvernance())
     app.include_router(construire_routes_explication())
     app.include_router(construire_routes_rag())
+    app.include_router(construire_routes_pipeline())
 
     @app.middleware("http")
     async def journaliser_requete(
