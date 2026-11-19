@@ -165,6 +165,34 @@ async def create_tenant_audit_pool(tenant_id: UUID) -> asyncpg.Pool:
     return pool
 
 
+async def create_tenant_pipeline_pool(tenant_id: UUID) -> asyncpg.Pool:
+    """Pool `pipeline` du tenant : API d'ingestion/scoring, droits minimaux."""
+    key = (tenant_id, "pipeline")
+    if key in _tenant_pools:
+        return _tenant_pools[key]
+
+    runtime = get_runtime_settings()
+    credentials = get_tenant_role_credentials(tenant_id, "pipeline")
+    try:
+        pool = await asyncpg.create_pool(
+            host=runtime.host,
+            port=runtime.port,
+            database=runtime.db,
+            user=credentials.username,
+            password=credentials.password.get_secret_value(),
+            min_size=1,
+            max_size=min(5, runtime.pool_max_size),
+            statement_cache_size=0,
+        )
+    except (OSError, asyncpg.PostgresError) as exc:
+        raise ConnectionRefusedError(
+            "Connexion PostgreSQL pipeline refusée pour le tenant demandé. "
+            "Vérifier son provisioning et TENANT_DB_CREDENTIALS_JSON."
+        ) from exc
+    _tenant_pools[key] = pool
+    return pool
+
+
 async def create_tenant_pool_for_schema(schema_name: str) -> asyncpg.Pool:
     """Résout un schéma actif via le rôle de contrôle puis ouvre son pool limité."""
     from brique_01_postgresql.tenant_provisioning import validate_schema_name

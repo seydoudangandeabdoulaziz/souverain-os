@@ -135,6 +135,10 @@ uv run mypy src/
 - `.env` avec les identifiants réels — jamais commité.
 - `data_classification` posée dès la fondation du schéma, pas ajoutée après coup.
 
+## Extension additive — rôle `pipeline` (migration 0009)
+
+Pour l'API d'ingestion/scoring (Brique 9), B1 accepte un troisième but de rôle tenant, `pipeline` (`sov_p_<tenant>`), sans rien changer aux rôles `data` et `audit` : migration `0009_tenant_pipeline_role.sql` (élargit le `CHECK` de `shared.tenant_login_map.purpose`), `tenant_credentials.py`, `tenant_roles.py`, `create_tenant_pipeline_pool()`. Le rôle est `NOLOGIN` jusqu'à `scripts/provision_tenant_roles.py --expected-database … --with-pipeline` (option désactivée par défaut). Droits : liste blanche de tables (`SELECT/INSERT` sur `transactions`, `detections`, `ingestion_keys` ; `UPDATE` seulement sur `alertes` et `pipeline_cursor`), jamais `CREATE`, `DELETE`, `TRUNCATE` ni accès à `shared.users`, à l'audit ou à un autre tenant. Tests : `tests/test_pipeline_role.py`.
+
 ## Dépendances avec les briques futures
 
 - Brique 2 (Auth/RBAC) s'appuiera sur `shared.tenants_registry` pour résoudre le tenant courant.

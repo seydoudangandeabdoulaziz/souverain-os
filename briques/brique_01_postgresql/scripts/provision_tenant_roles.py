@@ -91,7 +91,9 @@ async def _ensure_role(
     return await provision_tenant_role(connection, tenant_id, schema, purpose)
 
 
-async def main(expected_database: str, env_file: Path | None = None) -> None:
+async def main(
+    expected_database: str, env_file: Path | None = None, with_pipeline: bool = False
+) -> None:
     path = _env_path(env_file)
     lines, mapping = _read_mapping(path)
     original = path.read_bytes()
@@ -116,10 +118,11 @@ async def main(expected_database: str, env_file: Path | None = None) -> None:
             for tenant in tenants:
                 key = str(tenant["tenant_id"])
                 entry = mapping.setdefault(key, {})
-                for purpose, key_name in (
-                    ("data", "data_password"),
-                    ("audit", "audit_password"),
-                ):
+                purposes = [("data", "data_password"), ("audit", "audit_password")]
+                if with_pipeline:
+                    # Rôle API d'ingestion/scoring : opt-in explicite, jamais par défaut.
+                    purposes.append(("pipeline", "pipeline_password"))
+                for purpose, key_name in purposes:
                     role = await _ensure_role(
                         connection, tenant["tenant_id"], tenant["schema_name"], purpose
                     )
@@ -160,5 +163,11 @@ if __name__ == "__main__":
         type=Path,
         help="Fichier de configuration local; .env à la racine par défaut.",
     )
+    parser.add_argument(
+        "--with-pipeline",
+        action="store_true",
+        help="Provisionne aussi le rôle `pipeline` (API d'ingestion/scoring). "
+        "Désactivé par défaut : le comportement historique (data, audit) est inchangé.",
+    )
     arguments = parser.parse_args()
-    asyncio.run(main(arguments.expected_database, arguments.env_file))
+    asyncio.run(main(arguments.expected_database, arguments.env_file, arguments.with_pipeline))

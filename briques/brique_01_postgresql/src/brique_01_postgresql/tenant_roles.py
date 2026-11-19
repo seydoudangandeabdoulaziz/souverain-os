@@ -8,6 +8,17 @@ import asyncpg
 
 from brique_01_postgresql.tenant_credentials import role_name_for_tenant
 
+# Tables tenant accessibles au rôle `pipeline`, avec leurs seuls privilèges.
+# B1 ne connaît que des noms de tables (même principe que l'event trigger
+# d'intégrité, ADR-003) ; une table absente est simplement ignorée.
+_PIPELINE_TENANT_TABLES: tuple[tuple[str, str], ...] = (
+    ("transactions", "SELECT, INSERT"),
+    ("detections", "SELECT, INSERT"),
+    ("alertes", "SELECT, INSERT, UPDATE"),
+    ("ingestion_keys", "SELECT, INSERT"),
+    ("pipeline_cursor", "SELECT, INSERT, UPDATE"),
+)
+
 
 async def _execute_formatted(
     connection: asyncpg.Connection, template: str, *values: str
@@ -27,8 +38,8 @@ async def provision_tenant_role(
     purpose: str,
 ) -> str:
     """Crée le mapping et les ACL minimales, sans activer de secret de rôle."""
-    if purpose not in {"data", "audit"}:
-        raise ValueError("purpose doit valoir 'data' ou 'audit'")
+    if purpose not in {"data", "audit", "pipeline"}:
+        raise ValueError("purpose doit valoir 'data', 'audit' ou 'pipeline'")
     role = role_name_for_tenant(tenant_id, purpose)
     exists = await connection.fetchval(
         "SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1)", role
@@ -125,7 +136,7 @@ async def provision_tenant_role(
             await _execute_formatted(
                 connection, "REVOKE ALL ON TABLE %I.audit_log FROM %I", schema, role
             )
-    else:
+    elif purpose == "audit":
         audit_grants = (
             ("GRANT USAGE ON SCHEMA %I TO %I", schema, role),
             ("GRANT USAGE ON SCHEMA shared TO %I", role),
@@ -144,5 +155,33 @@ async def provision_tenant_role(
         if await connection.fetchval("SELECT to_regclass($1) IS NOT NULL", f"{schema}.alertes"):
             await _execute_formatted(
                 connection, "GRANT SELECT,UPDATE ON TABLE %I.alertes TO %I", schema, role
+            )
+    else:
+        # Rôle `pipeline` (API d'ingestion/scoring) : liste blanche stricte.
+        # Aucun CREATE, aucun DELETE/TRUNCATE, aucun accès à shared.users,
+        # à l'audit métier ni à la gouvernance. Le registre n'expose que la
+        # ligne du tenant (RLS via shared.current_login_tenant_id()).
+        base_grants = (
+            ("GRANT USAGE ON SCHEMA %I TO %I", schema, role),
+            ("GRANT USAGE ON SCHEMA shared TO %I", role),
+            ("GRANT SELECT ON shared.tenants_registry TO %I", role),
+            ("GRANT EXECUTE ON FUNCTION shared.current_login_tenant_id() TO %I", role),
+        )
+        for grant in base_grants:
+            await _execute_formatted(connection, *grant)
+        for table, privileges in _PIPELINE_TENANT_TABLES:
+            if await connection.fetchval(
+                "SELECT to_regclass($1) IS NOT NULL", f"{schema}.{table}"
+            ):
+                await _execute_formatted(
+                    connection,
+                    f"GRANT {privileges} ON TABLE %I.%I TO %I",
+                    schema,
+                    table,
+                    role,
+                )
+        if await connection.fetchval("SELECT to_regclass('shared.api_clients') IS NOT NULL"):
+            await _execute_formatted(
+                connection, "GRANT SELECT ON TABLE shared.api_clients TO %I", role
             )
     return role
