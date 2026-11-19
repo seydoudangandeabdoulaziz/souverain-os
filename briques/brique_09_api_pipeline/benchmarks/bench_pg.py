@@ -35,7 +35,10 @@ from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tests"))
 
 import asyncpg  # noqa: E402
-from brique_01_postgresql.connection import close_tenant_pools, create_tenant_pipeline_pool  # noqa: E402
+from brique_01_postgresql.connection import (  # noqa: E402
+    close_tenant_pools,
+    create_tenant_pipeline_pool,
+)
 from brique_01_postgresql.tenant_credentials import role_name_for_tenant  # noqa: E402
 from brique_09_api_pipeline import cycle as module_cycle  # noqa: E402
 from brique_09_api_pipeline.cycle import executer_cycle  # noqa: E402
