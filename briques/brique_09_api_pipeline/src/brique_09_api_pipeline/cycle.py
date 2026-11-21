@@ -54,7 +54,7 @@ _HISTORIQUE = """
     JOIN {schema}.transactions t
       ON t.sender_account = q.acct
      AND t.occurred_at >= q.lb AND t.occurred_at < q.ub AND t.occurred_at >= $4
-    UNION
+    UNION ALL
     SELECT t.transaction_id, t.sender_account, t.receiver_account, t.amount, t.channel,
            t.occurred_at
     FROM unnest($1::text[], $2::timestamptz[], $3::timestamptz[]) AS q(acct, lb, ub)
@@ -111,6 +111,7 @@ async def _charger_episodes(
     """
     brut: dict[UUID, tuple[str, str, float, str, datetime]] = {}
     horodatages: dict[str, list[tuple[datetime, UUID]]] = {c: [] for c in touches}
+    vus_par_compte: dict[str, set[UUID]] = {c: set() for c in touches}
     etape_de: dict[str, int] = dict.fromkeys(touches, 0)
     borne_de: dict[str, datetime] = {}
     plafond_de: dict[str, datetime] = dict.fromkeys(touches, _JUSQU_A_LA_FIN)
@@ -132,7 +133,12 @@ async def _charger_episodes(
             if identifiant not in brut:
                 brut[identifiant] = (emetteur, destinataire, float(montant), canal, quand)
             for compte in {emetteur, destinataire}:
-                if compte in a_traiter and borne_de[compte] <= quand < plafond_de[compte]:
+                if (
+                    compte in a_traiter
+                    and borne_de[compte] <= quand < plafond_de[compte]
+                    and identifiant not in vus_par_compte[compte]
+                ):
+                    vus_par_compte[compte].add(identifiant)
                     horodatages[compte].append((quand, identifiant))
         suivants: set[str] = set()
         for compte in comptes:

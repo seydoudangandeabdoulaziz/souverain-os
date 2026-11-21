@@ -30,6 +30,6 @@ _CHAMPS_AUTORISES = frozenset(
 
 
 def journaliser(evenement: str, **champs: object) -> None:
-    ligne = {"ts": datetime.now(UTC).isoformat(), "evenement": evenement}
+    ligne = {"ts": datetime.now(UTC).isoformat(timespec="seconds"), "evenement": evenement}
     ligne.update({k: str(v) for k, v in champs.items() if k in _CHAMPS_AUTORISES})
     _logger.info(json.dumps(ligne, ensure_ascii=False, sort_keys=True))

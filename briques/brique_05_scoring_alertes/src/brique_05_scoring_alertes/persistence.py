@@ -76,6 +76,38 @@ _REQUETE_NOUVELLE_ALERTE = """
 """
 
 
+
+_REQUETE_UPSERT_GROUPÉ = """
+    INSERT INTO {schema}.alertes
+        (alerte_id, tenant_id, country_code, data_classification,
+         compte_pivot, score, pattern_types_impliques, detection_ids,
+         fenetre_debut, fenetre_fin, details)
+    SELECT
+        x.alerte_id, $2, $3, $4,
+        x.compte_pivot, x.score, x.pattern_types_impliques,
+        x.detection_ids, x.fenetre_debut, x.fenetre_fin, x.details
+    FROM jsonb_to_recordset($1::jsonb) AS x(
+        alerte_id uuid,
+        compte_pivot text,
+        score integer,
+        pattern_types_impliques text[],
+        detection_ids uuid[],
+        fenetre_debut timestamptz,
+        fenetre_fin timestamptz,
+        details jsonb
+    )
+    ON CONFLICT (compte_pivot) WHERE statut = 'ouverte'
+    DO UPDATE SET
+        score = EXCLUDED.score,
+        pattern_types_impliques = EXCLUDED.pattern_types_impliques,
+        detection_ids = EXCLUDED.detection_ids,
+        fenetre_fin = EXCLUDED.fenetre_fin,
+        details = EXCLUDED.details,
+        updated_at = now()
+    RETURNING (xmax = 0) AS a_ete_creee
+"""
+
+
 @dataclass(frozen=True)
 class MetadonneesTenant:
     tenant_id: UUID
@@ -191,37 +223,52 @@ async def enregistrer_scores(
     nom_schema_tenant: str,
     scores: list[ScoreCompte],
 ) -> ResultatPersistence:
-    """Enregistre un cycle de scoring complet.
+    """Enregistre les alertes du cycle avec un UPSERT SQL groupé.
 
-    Pour chaque ScoreCompte dont le score franchit SEUIL_ALERTE : crée
-    ou met à jour l'alerte ouverte du compte_pivot. Les comptes sous le
-    seuil ne produisent aucune écriture — rien à marquer, puisque la
-    fenêtre est entièrement recalculée à chaque cycle (voir lecture.py).
-    Une transaction par compte_pivot.
+    La fenêtre est toujours recalculée intégralement. Les comptes sous
+    le seuil ne produisent aucune écriture. L'index unique partiel
+    garantit l'unicité des alertes ouvertes.
     """
     if not scores:
         return ResultatPersistence(0, 0, 0)
 
+    scores_eligibles = [
+        score for score in scores if score.score >= SEUIL_ALERTE
+    ]
+
+    if not scores_eligibles:
+        return ResultatPersistence(len(scores), 0, 0)
+
     metadonnees = await recuperer_metadonnees_tenant(pool, nom_schema_tenant)
 
-    nb_alertes_creees = 0
-    nb_alertes_mises_a_jour = 0
+    lignes = [
+        {
+            "alerte_id": str(uuid4()),
+            "compte_pivot": score.compte_pivot,
+            "score": score.score,
+            "pattern_types_impliques": score.pattern_types_impliques,
+            "detection_ids": [str(detection_id) for detection_id in score.detection_ids],
+            "fenetre_debut": score.fenetre_debut.isoformat(),
+            "fenetre_fin": score.fenetre_fin.isoformat(),
+            "details": score.details,
+        }
+        for score in scores_eligibles
+    ]
 
     async with pool.acquire() as connexion:
         await _assurer_tables(connexion, nom_schema_tenant)
 
-        for score_compte in scores:
-            if score_compte.score < SEUIL_ALERTE:
-                continue
+        async with connexion.transaction():
+            resultats = await connexion.fetch(
+                _REQUETE_UPSERT_GROUPÉ.format(schema=nom_schema_tenant),
+                json.dumps(lignes, default=str),
+                metadonnees.tenant_id,
+                metadonnees.country_code,
+                metadonnees.data_classification,
+            )
 
-            async with connexion.transaction():
-                _, a_ete_creee = await _upserter_alerte(
-                    connexion, nom_schema_tenant, metadonnees, score_compte
-                )
-                if a_ete_creee:
-                    nb_alertes_creees += 1
-                else:
-                    nb_alertes_mises_a_jour += 1
+    nb_alertes_creees = sum(1 for ligne in resultats if ligne["a_ete_creee"])
+    nb_alertes_mises_a_jour = len(resultats) - nb_alertes_creees
 
     return ResultatPersistence(
         nb_comptes_scores=len(scores),
